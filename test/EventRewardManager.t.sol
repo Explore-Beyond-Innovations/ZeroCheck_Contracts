@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
+import "../src/EventManager.sol";
 import "../src/EventRewardManager.sol";
 
 contract EventRewardManagerTest {
+    EventManager public eventManager;
     EventRewardManager public rewardManager;
     MockERC20 public usdcToken;
     MockERC20 public wldToken;
@@ -18,11 +20,14 @@ contract EventRewardManagerTest {
         usdcToken = new MockERC20("USDC", "USDC", 6);
         wldToken = new MockERC20("WLD", "WLD", 18);
 
+        eventManager = new EventManager();
         rewardManager = new EventRewardManager();
     }
 
     function testSetupUSDCTokenReward() public {
-        uint256 eventId = 1;
+        eventManager.addEventForTesting(0, "Test Event", address(this));
+
+        uint256 eventId = 0;
         uint256 rewardAmount = 1000 * 10 ** 6; // 1000 USDC
 
         rewardManager.setupTokenReward(
@@ -47,7 +52,9 @@ contract EventRewardManagerTest {
     }
 
     function testTransferTokenReward() public {
-        uint256 eventId = 1;
+        eventManager.addEventForTesting(0, "Test Event", address(this));
+
+        uint256 eventId = 0;
         uint256 initialReward = 1000 * 10 ** 6; // 1000 USDC
         uint256 additionalDeposit = 500 * 10 ** 6; // 500 USDC
 
@@ -72,7 +79,9 @@ contract EventRewardManagerTest {
     }
 
     function testDistributeTokenReward() public {
-        uint256 eventId = 1;
+        eventManager.addEventForTesting(0, "Test Event", address(this));
+
+        uint256 eventId = 0;
         uint256 initialReward = 1000 * 10 ** 6; // 1000 USDC
         uint256 participantReward = 100 * 10 ** 6; // 100 USDC
 
@@ -84,7 +93,10 @@ contract EventRewardManagerTest {
             initialReward
         );
 
-        usdcToken.mint(address(rewardManager), initialReward);
+        usdcToken.mint(address(this), initialReward);
+        usdcToken.approve(address(rewardManager), initialReward);
+
+        rewardManager.transferTokenReward(eventId, initialReward);
 
         // Distribute reward to participant
         rewardManager.distributeTokenReward(

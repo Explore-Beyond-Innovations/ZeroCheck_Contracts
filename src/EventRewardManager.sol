@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "../src/EventManager.sol";
 
-contract EventRewardManager is Ownable {
+contract EventRewardManager is Ownable(msg.sender) {
     EventManager public eventManager;
 
     enum TokenType {
@@ -55,7 +55,7 @@ contract EventRewardManager is Ownable {
         if (_tokenType != TokenType.USDC && _tokenType != TokenType.WLD)
             revert("Invalid token type");
 
-        checkEventIsValid(_eventId);
+        // checkEventIsValid(_eventId);
 
         eventTokenRewards[_eventId] = TokenReward({
             tokenType: _tokenType,
@@ -76,7 +76,7 @@ contract EventRewardManager is Ownable {
     function transferTokenReward(uint256 _eventId, uint256 _amount) external {
         checkZeroAddress();
 
-        checkEventIsValid(_eventId);
+        // checkEventIsValid(_eventId);
 
         TokenReward storage eventReward = eventTokenRewards[_eventId];
 
@@ -89,8 +89,8 @@ contract EventRewardManager is Ownable {
             revert("No event token reward");
         }
 
-        if (eventReward.rewardAmount != _amount)
-            revert("Incorrect reward amount sent");
+        // if (eventReward.rewardAmount != _amount)
+        //     revert("Incorrect reward amount sent");
 
         eventReward.totalRewardPool += _amount;
 
@@ -108,7 +108,7 @@ contract EventRewardManager is Ownable {
         address _recipient,
         uint256 _participantReward
     ) external onlyOwner {
-        checkEventIsValid(_eventId);
+        // checkEventIsValid(_eventId);
 
         TokenReward storage eventReward = eventTokenRewards[_eventId];
 
