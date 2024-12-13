@@ -21,8 +21,6 @@ contract EventManagerTest is Test {
         assertEq(evt.id, 0);
     }
 
-   
-
     function testGetNonExistentEvent() public {
         vm.expectRevert("Event does not exist");
         eventManager.getEvent(0);

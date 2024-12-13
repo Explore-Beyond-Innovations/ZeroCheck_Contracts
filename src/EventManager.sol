@@ -8,9 +8,7 @@ contract EventManager {
         string description;
     }
 
-   
     Event[] public events;
-
 
     //fetch event by ID
     function getEvent(uint256 id) public view returns (Event memory) {
@@ -25,10 +23,6 @@ contract EventManager {
 
     // Function to add events for testing purposes
     function addEventForTesting(uint256 id, string memory description, address creator) public {
-        events.push(Event({
-            id: id,
-            description: description,
-            creator: creator
-        }));
+        events.push(Event({id: id, description: description, creator: creator}));
     }
 }
