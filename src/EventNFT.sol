@@ -3,6 +3,7 @@ pragma solidity ^0.8.22;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract EventNFT is ERC721, Ownable {
     uint256 private _nextTokenId;
@@ -10,7 +11,8 @@ contract EventNFT is ERC721, Ownable {
     uint256 public maxSupply;
 
     address public eventContract;
-    mapping(address => bool) public participants; // Track eligible participants
+
+    bytes32 public merkleRoot; // Merkle root of the participant list
     mapping(address => bool) public claimed; // Track if an address has already claimed an NFT
 
     constructor(
@@ -18,10 +20,12 @@ contract EventNFT is ERC721, Ownable {
         string memory symbol,
         uint256 _maxSupply,
         string memory baseURI,
+        address _eventContract,
         address owner
     ) ERC721(name, symbol) Ownable(owner) {
         _baseTokenURI = baseURI;
         maxSupply = _maxSupply;
+        eventContract = _eventContract;
     }
 
     modifier onlyEventContract() {
@@ -32,9 +36,16 @@ contract EventNFT is ERC721, Ownable {
         _;
     }
 
-    modifier onlyEligibleParticipant(address participant) {
+    modifier onlyEligibleParticipant(
+        address participant,
+        bytes32[] calldata proof
+    ) {
         require(
-            participants[participant],
+            MerkleProof.verify(
+                proof,
+                merkleRoot,
+                keccak256(abi.encodePacked(participant))
+            ),
             "EventNFT: You are not an eligible participant"
         );
         require(
@@ -44,24 +55,19 @@ contract EventNFT is ERC721, Ownable {
         _;
     }
 
+    function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
+        merkleRoot = _merkleRoot;
+    }
+
     function setEventContract(address _eventContract) external onlyOwner {
         require(_eventContract != address(0), "Invalid address");
         eventContract = _eventContract;
     }
 
-    function addParticipant(address participant) external onlyEventContract {
-        require(participant != address(0), "Invalid address");
-        participants[participant] = true;
-    }
-
-    function removeParticipant(address participant) external onlyEventContract {
-        require(participant != address(0), "Invalid address");
-        participants[participant] = false;
-    }
-
     function claimNFT(
-        address participant
-    ) external onlyEventContract onlyEligibleParticipant(participant) {
+        address participant,
+        bytes32[] calldata proof
+    ) external onlyEventContract onlyEligibleParticipant(participant, proof) {
         require(_nextTokenId < maxSupply, "Max supply reached");
 
         claimed[participant] = true;
