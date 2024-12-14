@@ -19,16 +19,19 @@ contract EventManager {
     event ParticipantRegistered(uint256 eventId, address indexed participant);
     event MerkleRootGenerated(uint256 eventId, bytes32 merkleRoot);
 
+<<<<<<< HEAD
     mapping(uint256 => mapping(address => bool)) private registeredParticipants;
 
+=======
+>>>>>>> 727e4bd (feat: integrate World ID for event registration in EventManager contract)
     mapping(uint256 => Event) private events;
     uint256[] private eventIds;
     uint256 private nextEventId;
 
-    mapping(uint256 => bool) private nullifierHashes; // Prevent double registration
+    mapping(uint256 => bool) private nullifierHashes;
 
-    IWorldID public worldId; // World ID interface
-    uint256 public worldIdRoot; // World ID Merkle Root
+    IWorldID public worldId;
+    uint256 public worldIdRoot;
 
     constructor(address _worldId, uint256 _root) {
         worldId = IWorldID(_worldId);
