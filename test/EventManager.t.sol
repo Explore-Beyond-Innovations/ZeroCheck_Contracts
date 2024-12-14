@@ -8,7 +8,7 @@ contract EventManagerTest is Test {
     EventManager private eventManager;
     address constant WORLD_ID_CONTRACT = address(0x1234);
     uint256 constant WORLD_ID_ROOT = 123456789;
-    
+
     event EventRegistered(uint256 id, string description, address indexed creator);
 
     function setUp() public {
