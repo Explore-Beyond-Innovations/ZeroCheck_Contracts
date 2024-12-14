@@ -12,17 +12,14 @@ contract EventManager {
     }
 
     Event[] public events;
-     
+
     //  State Variable for Create Events
     uint256 public nextEventId;
-    
+
     // Create Events Function
-    function createEvent(
-        string memory name, 
-        string memory description, 
-        uint256 timestamp, 
-        string memory rewardType
-    ) public {
+    function createEvent(string memory name, string memory description, uint256 timestamp, string memory rewardType)
+        public
+    {
         // Validation checks
         require(bytes(name).length > 0, "Event name is required");
         require(bytes(description).length > 0, "Description is required");
@@ -30,14 +27,16 @@ contract EventManager {
         require(bytes(rewardType).length > 0, "Reward type is required");
 
         // Create the event
-        events.push(Event({
-            id: nextEventId,
-            creator: msg.sender,
-            name: name,
-            description: description,
-            timestamp: timestamp,
-            rewardType: rewardType
-        }));
+        events.push(
+            Event({
+                id: nextEventId,
+                creator: msg.sender,
+                name: name,
+                description: description,
+                timestamp: timestamp,
+                rewardType: rewardType
+            })
+        );
 
         // Increment the event ID
         nextEventId++;
@@ -55,8 +54,23 @@ contract EventManager {
     }
 
     // Function to add events for testing purposes
-    function addEventForTesting(uint256 id, string memory description, address creator, string memory name, uint256 timestamp, string memory rewardType) public {
-        events.push(Event({id: id, description: description, creator: creator, name: name, timestamp: timestamp,
-            rewardType: rewardType}));
+    function addEventForTesting(
+        uint256 id,
+        string memory description,
+        address creator,
+        string memory name,
+        uint256 timestamp,
+        string memory rewardType
+    ) public {
+        events.push(
+            Event({
+                id: id,
+                description: description,
+                creator: creator,
+                name: name,
+                timestamp: timestamp,
+                rewardType: rewardType
+            })
+        );
     }
 }

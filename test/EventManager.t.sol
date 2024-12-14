@@ -46,12 +46,7 @@ contract EventManagerTest is Test {
         string memory eventRewardType = "Token";
 
         // Act
-        eventManager.createEvent(
-            eventName,
-            eventDescription,
-            eventTimestamp,
-            eventRewardType
-        );
+        eventManager.createEvent(eventName, eventDescription, eventTimestamp, eventRewardType);
 
         // Assert
         EventManager.Event memory evt = eventManager.getEvent(0);
@@ -72,12 +67,7 @@ contract EventManagerTest is Test {
 
         // Act & Assert
         vm.expectRevert(bytes("Event name is required"));
-        eventManager.createEvent(
-            emptyName,
-            eventDescription,
-            eventTimestamp,
-            eventRewardType
-        );
+        eventManager.createEvent(emptyName, eventDescription, eventTimestamp, eventRewardType);
     }
 
     function testCreateEventFailsWhenDescriptionIsEmpty() public {
@@ -89,12 +79,7 @@ contract EventManagerTest is Test {
 
         // Act & Assert
         vm.expectRevert(bytes("Description is required"));
-        eventManager.createEvent(
-            eventName,
-            emptyDescription,
-            eventTimestamp,
-            eventRewardType
-        );
+        eventManager.createEvent(eventName, emptyDescription, eventTimestamp, eventRewardType);
     }
 
     function testCreateEventFailsWhenTimestampIsNotFuture() public {
@@ -109,12 +94,7 @@ contract EventManagerTest is Test {
         vm.expectRevert(bytes("Timestamp must be in the future"));
 
         // Assert
-        eventManager.createEvent(
-            eventName,
-            eventDescription,
-            pastTimestamp,
-            eventRewardType
-        );
+        eventManager.createEvent(eventName, eventDescription, pastTimestamp, eventRewardType);
     }
 
     function testCreateEventFailsWhenRewardTypeIsEmpty() public {
@@ -126,11 +106,6 @@ contract EventManagerTest is Test {
 
         // Act & Assert
         vm.expectRevert(bytes("Reward type is required"));
-        eventManager.createEvent(
-            eventName,
-            eventDescription,
-            eventTimestamp,
-            emptyRewardType
-        );
+        eventManager.createEvent(eventName, eventDescription, eventTimestamp, emptyRewardType);
     }
 }
