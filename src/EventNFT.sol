@@ -29,29 +29,16 @@ contract EventNFT is ERC721, Ownable {
     }
 
     modifier onlyEventContract() {
-        require(
-            msg.sender == eventContract,
-            "EventNFT: Only event contract can mint"
-        );
+        require(msg.sender == eventContract, "EventNFT: Only event contract can mint");
         _;
     }
 
-    modifier onlyEligibleParticipant(
-        address participant,
-        bytes32[] calldata proof
-    ) {
+    modifier onlyEligibleParticipant(address participant, bytes32[] calldata proof) {
         require(
-            MerkleProof.verify(
-                proof,
-                merkleRoot,
-                keccak256(abi.encodePacked(participant))
-            ),
+            MerkleProof.verify(proof, merkleRoot, keccak256(abi.encodePacked(participant))),
             "EventNFT: You are not an eligible participant"
         );
-        require(
-            !claimed[participant],
-            "EventNFT: You have already claimed your NFT"
-        );
+        require(!claimed[participant], "EventNFT: You have already claimed your NFT");
         _;
     }
 
@@ -64,10 +51,11 @@ contract EventNFT is ERC721, Ownable {
         eventContract = _eventContract;
     }
 
-    function claimNFT(
-        address participant,
-        bytes32[] calldata proof
-    ) external onlyEventContract onlyEligibleParticipant(participant, proof) {
+    function claimNFT(address participant, bytes32[] calldata proof)
+        external
+        onlyEventContract
+        onlyEligibleParticipant(participant, proof)
+    {
         require(_nextTokenId < maxSupply, "Max supply reached");
 
         claimed[participant] = true;
@@ -80,9 +68,7 @@ contract EventNFT is ERC721, Ownable {
         _baseTokenURI = baseURI;
     }
 
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(ERC721) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }
