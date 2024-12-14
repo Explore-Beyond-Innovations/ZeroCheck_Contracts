@@ -6,13 +6,14 @@ import "../src/EventManager.sol";
 
 contract EventManagerTest is Test {
     EventManager private eventManager;
-    address constant WORLD_ID_CONTRACT = address(0x1234);
-    uint256 constant WORLD_ID_ROOT = 123456789;
+    address private creator = address(1);
+    address private participant1 = address(2);
+    address private participant2 = address(3);
 
     event EventRegistered(uint256 id, string description, address indexed creator);
 
     function setUp() public {
-        eventManager = new EventManager(WORLD_ID_CONTRACT, WORLD_ID_ROOT);
+        eventManager = new EventManager();
     }
 
     function testGetEvent() public {
@@ -36,42 +37,51 @@ contract EventManagerTest is Test {
         assertEq(events[1].description, "Second Event");
     }
 
-    function testRegisterEvent() public {
-        string memory description = "World ID Event";
-        uint256 nullifierHash = 12345;
-        uint256[8] memory proof =
-            [uint256(1), uint256(2), uint256(3), uint256(4), uint256(5), uint256(6), uint256(7), uint256(8)];
+    function testRegisterParticipant() public {
+        // Register participant 1
+        vm.prank(participant1);
+        eventManager.registerParticipant(0);
 
-        vm.mockCall(
-            WORLD_ID_CONTRACT,
-            abi.encodeWithSignature("verifyProof(uint256,uint256,uint256[8])", WORLD_ID_ROOT, nullifierHash, proof),
-            abi.encode(true)
-        );
+        address[] memory participants = eventManager.getParticipants(0);
+        assertEq(participants.length, 1);
+        assertEq(participants[0], participant1);
 
-        vm.expectEmit(true, true, false, true);
-        emit EventRegistered(0, description, address(this));
+        // Register participant 2
+        vm.prank(participant2);
+        eventManager.registerParticipant(0);
 
-        eventManager.registerEvent(description, nullifierHash, proof);
+        participants = eventManager.getParticipants(0);
+        assertEq(participants.length, 2);
+        assertEq(participants[1], participant2);
 
-        EventManager.Event memory evt = eventManager.getEvent(0);
-        assertEq(evt.description, "World ID Event");
-        assertEq(evt.creator, address(this));
+        vm.expectRevert("Already registered as participant");
+        vm.prank(participant1);
+        eventManager.registerParticipant(0);
     }
 
-    function testDoubleRegistrationFails() public {
-        uint256 nullifierHash = 12345;
-        uint256[8] memory proof =
-            [uint256(1), uint256(2), uint256(3), uint256(4), uint256(5), uint256(6), uint256(7), uint256(8)];
+    function testGenerateMerkleRoot() public {
+        vm.prank(participant1);
+        eventManager.registerParticipant(0);
 
-        vm.mockCall(
-            WORLD_ID_CONTRACT,
-            abi.encodeWithSignature("verifyProof(uint256,uint256,uint256[8])", WORLD_ID_ROOT, nullifierHash, proof),
-            abi.encode(true)
-        );
+        vm.prank(participant2);
+        eventManager.registerParticipant(0);
 
-        eventManager.registerEvent("First Event", nullifierHash, proof);
+        vm.prank(creator);
+        eventManager.generateMerkleRoot(0);
 
-        vm.expectRevert("Already registered");
-        eventManager.registerEvent("Second Event", nullifierHash, proof);
+        bytes32 merkleRoot = eventManager.getMerkleRoot(0);
+        assertTrue(merkleRoot != bytes32(0), "Merkle root should not be empty");
+    }
+
+    function testOnlyCreatorCanGenerateMerkleRoot() public {
+        vm.prank(participant1);
+        eventManager.registerParticipant(0);
+
+        vm.prank(participant2);
+        eventManager.registerParticipant(0);
+
+        vm.expectRevert("Only the event creator can generate the Merkle root");
+        vm.prank(participant1);
+        eventManager.generateMerkleRoot(0);
     }
 }

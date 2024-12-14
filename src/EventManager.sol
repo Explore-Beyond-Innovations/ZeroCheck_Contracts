@@ -1,48 +1,69 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {IWorldID} from "./interfaces/IWorldID.sol";
+import {Merkle} from "murky/src/Merkle.sol";
 
-contract EventManager {
+contract EventManager is Merkle {
     struct Event {
         uint256 id;
         string description;
         address creator;
+        address[] participants;
+        bytes32 merkleRoot;
     }
 
-    event EventRegistered(uint256 id, string description, address indexed creator);
+    event ParticipantRegistered(uint256 eventId, address indexed participant);
+    event MerkleRootGenerated(uint256 eventId, bytes32 merkleRoot);
 
     mapping(uint256 => Event) private events;
     uint256[] private eventIds;
     uint256 private nextEventId;
 
-    mapping(uint256 => bool) private nullifierHashes;
+    mapping(uint256 => mapping(address => bool)) private registeredParticipants;
 
-    IWorldID public worldId;
-    uint256 public worldIdRoot;
+    /// @dev Register a participant for an existing event.
+    /// @param eventId The ID of the event to register for.
+    function registerParticipant(uint256 eventId) public {
+        require(eventId < nextEventId, "Event does not exist");
+        require(!registeredParticipants[eventId][msg.sender], "Already registered as participant");
 
-    constructor(address _worldId, uint256 _root) {
-        worldId = IWorldID(_worldId);
-        worldIdRoot = _root;
+        events[eventId].participants.push(msg.sender);
+        registeredParticipants[eventId][msg.sender] = true;
+
+        emit ParticipantRegistered(eventId, msg.sender);
     }
 
-    // Register an event using World ID verification
-    function registerEvent(string memory description, uint256 nullifierHash, uint256[8] calldata proof) public {
-        require(bytes(description).length > 0, "Description cannot be empty");
-        require(!nullifierHashes[nullifierHash], "Already registered");
+    /// @dev Generate a Merkle root for the registered participants of an event.
+    /// @param eventId The ID of the event.
+    function generateMerkleRoot(uint256 eventId) public {
+        require(eventId < nextEventId, "Event does not exist");
+        require(msg.sender == events[eventId].creator, "Only the event creator can generate the Merkle root");
 
-        // Verify World ID proof
-        worldId.verifyProof(worldIdRoot, nullifierHash, proof);
+        address[] memory participants = events[eventId].participants;
+        bytes32[] memory leafs = new bytes32[](participants.length);
 
-        // Register the event
-        uint256 id = nextEventId++;
-        events[id] = Event(id, description, msg.sender);
-        eventIds.push(id);
+        for (uint256 i = 0; i < participants.length; i++) {
+            leafs[i] = keccak256(abi.encodePacked(participants[i]));
+        }
 
-        // Mark nullifierHash as used
-        nullifierHashes[nullifierHash] = true;
+        bytes32 merkleRoot = getRoot(leafs);
+        events[eventId].merkleRoot = merkleRoot;
 
-        emit EventRegistered(id, description, msg.sender);
+        emit MerkleRootGenerated(eventId, merkleRoot);
+    }
+
+    /// @dev Retrieve the Merkle root for an event.
+    /// @param eventId The ID of the event.
+    function getMerkleRoot(uint256 eventId) public view returns (bytes32) {
+        require(eventId < nextEventId, "Event does not exist");
+        return events[eventId].merkleRoot;
+    }
+
+    /// @dev Get all participants of an event.
+    /// @param eventId The ID of the event.
+    function getParticipants(uint256 eventId) public view returns (address[] memory) {
+        require(eventId < nextEventId, "Event does not exist");
+        return events[eventId].participants;
     }
 
     // Retrieve an event by its ID
@@ -65,7 +86,15 @@ contract EventManager {
     // Test helper: Add event for testing only
     function addEventForTesting(uint256 id, string memory description, address creator) public {
         require(events[id].id == 0, "Event already exists");
-        events[id] = Event(id, description, creator);
+
+        events[id] = Event({
+            id: id,
+            description: description,
+            creator: creator,
+            participants: new address[](0),
+            merkleRoot: bytes32(0)
+        });
+
         eventIds.push(id);
     }
 }
