@@ -16,18 +16,14 @@ optimizer_runs = 10_000
 
 remappings = [
     'src/=src/',
-    '@openzeppelin/=lib/openzeppelin-contracts/',
     'ds-test/=lib/ds-test/src/',
     '@prb/test/=lib/prb-test/src/',
+    '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/'
 
 ]
 
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
-
-#[dependencies]
-#    "openzeppelin-contracts", "@openzeppelin-contracts" = { version = "5.0.2" }
-#    "forge-std"
 
 [fmt]
 line_length = 100

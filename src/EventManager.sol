@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+import { IWorldID } from './interfaces/IWorldID.sol';
+
 contract EventManager {
   ////////////////////////////////////////////////////////////////
   ///                      CONFIG STORAGE                      ///
@@ -21,12 +23,12 @@ contract EventManager {
   /// @param _appId The World ID App ID (from Developer Portal)
   /// @param _actionId The World ID Action (from Developer Portal)
   constructor(
-    address _worldID,
+    IWorldID _worldId,
     address _rewardContract,
     string memory _appId,
     string memory _actionId
   ) {
-    worldID = _worldID;
+    worldId = _worldId;
     rewardContract = _rewardContract;
     appId = _appId;
     actionId = _actionId;
@@ -58,5 +60,9 @@ contract EventManager {
   // Function to add events for testing purposes
   function addEventForTesting(uint256 id, string memory description, address creator) public {
     events.push(Event({ id: id, description: description, creator: creator }));
+  }
+
+  function getWorldId() public view returns (IWorldID) {
+    return worldId;
   }
 }
