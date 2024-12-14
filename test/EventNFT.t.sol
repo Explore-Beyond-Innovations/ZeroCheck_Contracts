@@ -24,14 +24,7 @@ contract EventNFTTest is Test, Merkle {
         participant1 = address(3);
         participant2 = address(4);
 
-        eventNFT = new EventNFT(
-            "EventNFT",
-            "ENFT",
-            100,
-            "https://base.uri/",
-            eventContract,
-            owner
-        );
+        eventNFT = new EventNFT("EventNFT", "ENFT", 100, "https://base.uri/", eventContract, owner);
 
         leafs.push(keccak256(abi.encodePacked(participant1)));
         leafs.push(keccak256(abi.encodePacked(participant2)));
@@ -46,11 +39,7 @@ contract EventNFTTest is Test, Merkle {
 
     function testDeploy() public view {
         assertEq(eventNFT.owner(), owner, "Owner address mismatch");
-        assertEq(
-            eventNFT.eventContract(),
-            eventContract,
-            "Event contract address mismatch"
-        );
+        assertEq(eventNFT.eventContract(), eventContract, "Event contract address mismatch");
         assertEq(eventNFT.maxSupply(), 100, "Max supply mismatch");
     }
 
@@ -58,30 +47,16 @@ contract EventNFTTest is Test, Merkle {
         vm.prank(eventContract);
         eventNFT.claimNFT(participant1, proof1);
 
-        assertTrue(
-            eventNFT.claimed(participant1),
-            "Participant1 should have claimed their NFT"
-        );
+        assertTrue(eventNFT.claimed(participant1), "Participant1 should have claimed their NFT");
 
-        assertEq(
-            eventNFT.balanceOf(participant1),
-            1,
-            "Participant1 should have 1 token"
-        );
+        assertEq(eventNFT.balanceOf(participant1), 1, "Participant1 should have 1 token");
 
         // Participant2 claims their NFT
         vm.prank(eventContract);
         eventNFT.claimNFT(participant2, proof2);
 
-        assertTrue(
-            eventNFT.claimed(participant2),
-            "Participant2 should have claimed their NFT"
-        );
-        assertEq(
-            eventNFT.balanceOf(participant2),
-            1,
-            "Participant2 should have 1 token"
-        );
+        assertTrue(eventNFT.claimed(participant2), "Participant2 should have claimed their NFT");
+        assertEq(eventNFT.balanceOf(participant2), 1, "Participant2 should have 1 token");
     }
 
     function testClaimNFTAlreadyClaimed() public {
@@ -114,17 +89,11 @@ contract EventNFTTest is Test, Merkle {
     }
 
     function testSetMerkleRoot() public {
-        bytes32 newMerkleRoot = keccak256(
-            abi.encodePacked(participant1, participant2)
-        ); // New Merkle root
+        bytes32 newMerkleRoot = keccak256(abi.encodePacked(participant1, participant2)); // New Merkle root
         vm.prank(owner);
         eventNFT.setMerkleRoot(newMerkleRoot);
 
-        assertEq(
-            eventNFT.merkleRoot(),
-            newMerkleRoot,
-            "Merkle root should be updated"
-        );
+        assertEq(eventNFT.merkleRoot(), newMerkleRoot, "Merkle root should be updated");
     }
 
     function testSetEventContract() public {
@@ -132,11 +101,7 @@ contract EventNFTTest is Test, Merkle {
         vm.prank(owner);
         eventNFT.setEventContract(newEventContract);
 
-        assertEq(
-            eventNFT.eventContract(),
-            newEventContract,
-            "Event contract address should be updated"
-        );
+        assertEq(eventNFT.eventContract(), newEventContract, "Event contract address should be updated");
     }
 
     function testOnlyOwnerCanSetEventContract() public {
