@@ -1,6 +1,25 @@
 [profile.default]
+solc = "0.8.19"
+
 src = "src"
 out = "out"
 libs = ["lib"]
+ffi = true
+
+
+remappings = [
+    'src/=src/',
+    '@openzeppelin/=lib/openzeppelin-contracts/',
+    'ds-test/=lib/ds-test/src/',
+    @prb/test/=lib/prb-test/src/,
+
+]
+
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+# Add dependencies for testing and development
+dependencies = [
+    "openzeppelin-contracts",
+    "forge-std"
+]

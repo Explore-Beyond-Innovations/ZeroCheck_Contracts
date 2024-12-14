@@ -11,6 +11,13 @@ contract EventManagerTest is Test {
         eventManager = new EventManager();
     }
 
+    function testEventManagerConstruction() public {
+        assertEq(eventManager.worldID(), address(1));
+        assertEq(eventManager.rewardContract(), address(2));
+        assertEq(eventManager.appId(), "appId");
+        assertEq(eventManager.actionId(), "actionId");
+    }
+
     function testGetEvent() public {
         // Use the test function to add an event
         eventManager.addEventForTesting(0, "Test Event", address(this));
