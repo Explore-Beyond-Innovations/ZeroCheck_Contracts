@@ -12,14 +12,14 @@ contract EventManager {
 
     event EventRegistered(uint256 id, string description, address indexed creator);
 
-    mapping(uint256 => Event) private events; // Store events by ID
-    uint256[] private eventIds; // Track event IDs for retrieval
+    mapping(uint256 => Event) private events;
+    uint256[] private eventIds;
     uint256 private nextEventId;
 
-    mapping(uint256 => bool) private nullifierHashes; // Prevent double registration
+    mapping(uint256 => bool) private nullifierHashes;
 
-    IWorldID public worldId; // World ID interface
-    uint256 public worldIdRoot; // World ID Merkle Root
+    IWorldID public worldId;
+    uint256 public worldIdRoot;
 
     constructor(address _worldId, uint256 _root) {
         worldId = IWorldID(_worldId);
