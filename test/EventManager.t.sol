@@ -9,7 +9,11 @@ contract EventManagerTest is Test {
     address constant WORLD_ID_CONTRACT = address(0x1234);
     uint256 constant WORLD_ID_ROOT = 123456789;
 
+<<<<<<< HEAD
     event ParticipantRegistered(uint256 eventId, address indexed participant);
+=======
+    event EventRegistered(uint256 id, string description, address indexed creator);
+>>>>>>> 17c7e11 (forge fmt)
 
     function setUp() public {
         eventManager = new EventManager(WORLD_ID_CONTRACT, WORLD_ID_ROOT);
