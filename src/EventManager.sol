@@ -19,19 +19,16 @@ contract EventManager {
     event ParticipantRegistered(uint256 eventId, address indexed participant);
     event MerkleRootGenerated(uint256 eventId, bytes32 merkleRoot);
 
-<<<<<<< HEAD
     mapping(uint256 => mapping(address => bool)) private registeredParticipants;
 
-=======
->>>>>>> 727e4bd (feat: integrate World ID for event registration in EventManager contract)
     mapping(uint256 => Event) private events;
     uint256[] private eventIds;
     uint256 private nextEventId;
 
-    mapping(uint256 => bool) private nullifierHashes;
+    mapping(uint256 => bool) private nullifierHashes; // Prevent double registration
 
-    IWorldID public worldId;
-    uint256 public worldIdRoot;
+    IWorldID public worldId; // World ID interface
+    uint256 public worldIdRoot; // World ID Merkle Root
 
     constructor(address _worldId, uint256 _root) {
         worldId = IWorldID(_worldId);
@@ -42,7 +39,6 @@ contract EventManager {
     /// @param eventId The ID of the event to register for.
     /// @param nullifierHash The nullifier hash provided by World ID to prevent double registration.
     /// @param proof The zk-proof for verification.
-<<<<<<< HEAD
     function registerParticipant(
         uint256 eventId,
         uint256 nullifierHash,
@@ -57,12 +53,20 @@ contract EventManager {
             !nullifierHashes[nullifierHash],
             "World ID verification already used"
         );
-=======
+
     function registerParticipant(uint256 eventId, uint256 nullifierHash, uint256[8] calldata proof) public {
         require(eventId < nextEventId, "Event does not exist");
         require(!registeredParticipants[eventId][msg.sender], "Already registered as participant");
         require(!nullifierHashes[nullifierHash], "World ID verification already used");
->>>>>>> c5efe6b (Resolve conflicts)
+        require(eventId < nextEventId, "Event does not exist");
+        require(
+            !registeredParticipants[eventId][msg.sender],
+            "Already registered as participant"
+        );
+        require(
+            !nullifierHashes[nullifierHash],
+            "World ID verification already used"
+        );
 
         // Verify the World ID proof
         worldId.verifyProof(worldIdRoot, nullifierHash, proof);
@@ -123,9 +127,6 @@ contract EventManager {
         return allEvents;
     }
 
-<<<<<<< HEAD
-}
-=======
     // Function to add events for testing purposes
     function addEventForTesting(
         uint256 id,
@@ -153,4 +154,4 @@ contract EventManager {
         }
     }
 }
->>>>>>> c5efe6b (Resolve conflicts)
+} 
