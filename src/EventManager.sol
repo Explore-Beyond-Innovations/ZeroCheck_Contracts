@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import { IWorldID } from './interfaces/IWorldID.sol';
+import { IWorldID } from "./interfaces/IWorldID.sol";
 
 contract EventManager {
   ////////////////////////////////////////////////////////////////
