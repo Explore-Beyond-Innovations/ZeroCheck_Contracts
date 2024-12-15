@@ -13,12 +13,15 @@ contract EventManagerTest is Test {
 
     function testGetEvent() public {
         // Use the test function to add an event
-        eventManager.addEventForTesting(0, "Test Event", address(this));
+        eventManager.addEventForTesting(0, "Test Event", address(this), "Event Name", block.timestamp + 1 days, "Gold");
 
         EventManager.Event memory evt = eventManager.getEvent(0);
         assertEq(evt.description, "Test Event");
         assertEq(evt.creator, address(this));
         assertEq(evt.id, 0);
+        assertEq(evt.name, "Event Name");
+        assertEq(evt.timestamp, block.timestamp + 1 days); 
+        assertEq(evt.rewardType, "Gold");
     }
 
     function testGetNonExistentEvent() public {
@@ -28,14 +31,18 @@ contract EventManagerTest is Test {
 
     function testGetAllEvents() public {
         // Use the test function to add events
-        eventManager.addEventForTesting(0, "First Event", address(this));
-        eventManager.addEventForTesting(1, "Second Event", address(this));
+        eventManager.addEventForTesting(0, "First Event", address(this), "Event One", block.timestamp + 1 days, "Gold");
+        eventManager.addEventForTesting(1, "Second Event", address(this), "Event Two", block.timestamp + 2 days, "Silver");
 
         EventManager.Event[] memory events = eventManager.getAllEvents();
         assertEq(events.length, 2);
         assertEq(events[0].description, "First Event");
         assertEq(events[1].description, "Second Event");
+        assertEq(events[0].name, "Event One");
+        assertEq(events[1].rewardType, "Silver");
     }
+    
+
 
     // Unit Test for Create Events
     function testCreateEventSuccess() public {
