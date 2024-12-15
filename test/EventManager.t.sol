@@ -20,7 +20,7 @@ contract EventManagerTest is Test {
         assertEq(evt.creator, address(this));
         assertEq(evt.id, 0);
         assertEq(evt.name, "Event Name");
-        assertEq(evt.timestamp, block.timestamp + 1 days); 
+        assertEq(evt.timestamp, block.timestamp + 1 days);
         assertEq(evt.rewardType, "Gold");
     }
 
@@ -32,7 +32,9 @@ contract EventManagerTest is Test {
     function testGetAllEvents() public {
         // Use the test function to add events
         eventManager.addEventForTesting(0, "First Event", address(this), "Event One", block.timestamp + 1 days, "Gold");
-        eventManager.addEventForTesting(1, "Second Event", address(this), "Event Two", block.timestamp + 2 days, "Silver");
+        eventManager.addEventForTesting(
+            1, "Second Event", address(this), "Event Two", block.timestamp + 2 days, "Silver"
+        );
 
         EventManager.Event[] memory events = eventManager.getAllEvents();
         assertEq(events.length, 2);
@@ -41,8 +43,6 @@ contract EventManagerTest is Test {
         assertEq(events[0].name, "Event One");
         assertEq(events[1].rewardType, "Silver");
     }
-    
-
 
     // Unit Test for Create Events
     function testCreateEventSuccess() public {
