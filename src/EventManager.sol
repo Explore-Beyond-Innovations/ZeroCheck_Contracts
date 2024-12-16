@@ -25,10 +25,10 @@ contract EventManager {
     uint256[] private eventIds;
     uint256 private nextEventId;
 
-    mapping(uint256 => bool) private nullifierHashes; // Prevent double registration
+    mapping(uint256 => bool) private nullifierHashes;
 
-    IWorldID public worldId; // World ID interface
-    uint256 public worldIdRoot; // World ID Merkle Root
+    IWorldID public worldId;
+    uint256 public worldIdRoot;
 
     constructor(address _worldId, uint256 _root) {
         worldId = IWorldID(_worldId);
@@ -39,55 +39,25 @@ contract EventManager {
     /// @param eventId The ID of the event to register for.
     /// @param nullifierHash The nullifier hash provided by World ID to prevent double registration.
     /// @param proof The zk-proof for verification.
-    function registerParticipant(
-        uint256 eventId,
-        uint256 nullifierHash,
-        uint256[8] calldata proof
-    ) public {
-        require(eventId < nextEventId, "Event does not exist");
-        require(
-            !registeredParticipants[eventId][msg.sender],
-            "Already registered as participant"
-        );
-        require(
-            !nullifierHashes[nullifierHash],
-            "World ID verification already used"
-        );
-
     function registerParticipant(uint256 eventId, uint256 nullifierHash, uint256[8] calldata proof) public {
         require(eventId < nextEventId, "Event does not exist");
         require(!registeredParticipants[eventId][msg.sender], "Already registered as participant");
         require(!nullifierHashes[nullifierHash], "World ID verification already used");
-        require(eventId < nextEventId, "Event does not exist");
-        require(
-            !registeredParticipants[eventId][msg.sender],
-            "Already registered as participant"
-        );
-        require(
-            !nullifierHashes[nullifierHash],
-            "World ID verification already used"
-        );
 
-        // Verify the World ID proof
         worldId.verifyProof(worldIdRoot, nullifierHash, proof);
 
-        // Register the participant for the event
         events[eventId].participants.push(msg.sender);
         registeredParticipants[eventId][msg.sender] = true;
 
-        // Mark the nullifierHash as used
         nullifierHashes[nullifierHash] = true;
 
         emit ParticipantRegistered(eventId, msg.sender);
     }
 
     // Create Events Function
-    function createEvent(
-        string memory name,
-        string memory description,
-        uint256 timestamp,
-        string memory rewardType
-    ) public {
+    function createEvent(string memory name, string memory description, uint256 timestamp, string memory rewardType)
+        public
+    {
         // Validation checks
         require(bytes(name).length > 0, "Event name is required");
         require(bytes(description).length > 0, "Description is required");
@@ -126,32 +96,4 @@ contract EventManager {
         }
         return allEvents;
     }
-
-    // Function to add events for testing purposes
-    function addEventForTesting(
-        uint256 id,
-        string memory description,
-        address creator,
-        string memory name,
-        uint256 timestamp,
-        string memory rewardType
-    ) public {
-        require(events[id].id == 0, "Event already exists");
-        events[id] = Event({
-            id: id,
-            description: description,
-            creator: creator,
-            name: name,
-            timestamp: timestamp,
-            rewardType: rewardType,
-            participants: new address[](0),
-            merkleRoot: bytes32(0)
-        });
-        eventIds.push(id);
-
-        if (id >= nextEventId) {
-            nextEventId = id + 1;
-        }
-    }
 }
-} 
