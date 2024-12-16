@@ -16,6 +16,7 @@ contract EventManagerTest is Test {
     }
 
     function testGetEvent() public {
+    
         // Use the createEvent function to add an event
         eventManager.createEvent("Event Name", "Test Event", block.timestamp + 1 days, "Gold");
 
@@ -41,6 +42,7 @@ contract EventManagerTest is Test {
         assertEq(events[1].rewardType, "Silver");
     }
 
+    // Unit Test for Create Events
     function testCreateEventSuccess() public {
         // Arrange
         string memory eventName = "Test Event";
