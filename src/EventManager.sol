@@ -91,7 +91,6 @@ contract EventManager {
 
     // Retrieve all events
     function getAllEvents() public view returns (Event[] memory) {
-
         Event[] memory allEvents = new Event[](eventIds.length);
         for (uint256 i = 0; i < eventIds.length; i++) {
             allEvents[i] = events[eventIds[i]];
