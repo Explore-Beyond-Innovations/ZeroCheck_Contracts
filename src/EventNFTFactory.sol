@@ -21,15 +21,10 @@ contract EventNFTFactory {
 
         length_ = eventNFTs.length;
 
-        emit EventNFTCreated(address(newEventNFT_), owner);
+        emit EventNFTCreated(address(newEventNFT_), msg.sender);
     }
 
-    function getEventNftClones() external returns (EventNFT[] memory) {
+    function getEventNFTClones() external view returns (EventNFT[] memory) {
         return eventNFTs;
-    }
-
-    function getDeployedEventNftAddress(uint256 _index) external view returns (address) {
-        require(_index < eventNFTs.length, "Index out of bounds");
-        return eventNFTs[_index];
     }
 }
