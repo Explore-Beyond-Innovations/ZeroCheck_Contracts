@@ -43,11 +43,11 @@ contract EventManager {
   uint256 public nextEventId;
 
   mapping(uint256 => mapping(address => bool)) public isParticipant; //EventId => USer Address =>
-    // Bool
+  // Bool
   mapping(uint256 => mapping(address => bool)) public hasClaimedReward; //EventId => USer Address =>
-    // Bool
+  // Bool
   mapping(uint256 => mapping(uint256 => bool)) public nullifierHashes; // eventId => nullifierHash
-    // => bool
+  // => bool
   mapping(uint256 => address[]) eventParticipant;
 
   ////////////////////////////////////////////////////////////////
@@ -77,7 +77,20 @@ contract EventManager {
   ///                        FUNCTIONS                         ///
   ////////////////////////////////////////////////////////////////
 
-  // Create Events Function
+  /**
+   * @notice Creates a new event with the specified details.
+   * @dev Validates inputs such as name, description, timestamp, and reward configuration.
+   * @param name The name of the event.
+   * @param description A description of the event.
+   * @param timestamp The scheduled timestamp of the event (must be in the future).
+   * @param _rewardType The type of reward for participants (TOKEN or NFT).
+   * @param _tokenAddress The address of the token/NFT contract (required if reward type is TOKEN or
+   * NFT).
+   * @param _amountReward The amount of ERC20 token reward per participant (if applicable).
+   * @param _firstregistrantBonus The bonus reward for the first registrant.
+   * @param bonusNft The NFT ID for the bonus reward (if reward is NFT).
+   * @param _eventNFT The address of the event-specific NFT contract.
+   */
   function createEvent(
     string memory name,
     string memory description,
@@ -126,18 +139,39 @@ contract EventManager {
     nextEventId++;
   }
 
-  //fetch event by ID
+  /**
+   * @notice Fetches the details of an event by its ID.
+   * @param id The ID of the event to retrieve.
+   * @return Event The event data associated with the given ID.
+   */
   function getEvent(uint256 id) public view returns (Event memory) {
     if (id >= events.length) revert("Event does not exist");
     return events[id];
   }
 
-  // Fetch all events
+  /**
+   * @notice Fetches the list of all events created in the contract.
+   * @return Event[] An array containing all event details.
+   */
   function getAllEvents() public view returns (Event[] memory) {
     return events;
   }
 
-  // Function to add events for testing purposes
+  /**
+   * @notice Adds an event manually for testing purposes.
+   * @dev This function is intended for testing scenarios to prepopulate events.
+   * @param id The unique ID of the event.
+   * @param description A description of the event.
+   * @param creator The address of the event creator.
+   * @param name The name of the event.
+   * @param timestamp The timestamp of the event.
+   * @param rewardType The reward type (None, TOKEN, or NFT).
+   * @param _tokenAddress The token/NFT contract address.
+   * @param _amountReward The amount of ERC20 token reward (if applicable).
+   * @param _firstregistrantBonus The bonus for the first registrant.
+   * @param bonusNft The NFT ID for the bonus (if applicable).
+   * @param _eventNFT The address of the Event NFT contract.
+   */
   function addEventForTesting(
     uint256 id,
     string memory description,
@@ -171,11 +205,23 @@ contract EventManager {
     );
   }
 
+  /**
+   * @notice Fetches the World ID contract address used for verification.
+   * @return IWorldID The address of the World ID router contract.
+   */
   function getWorldId() public view returns (IWorldID) {
     return worldId;
   }
 
-  //Register For Event
+  /**
+   * @notice Allows a user to register for an event using World ID verification.
+   * @dev Ensures the event has not started, the user has not already registered,
+   * and World ID verification is successful.
+   * @param eventId The ID of the event to register for.
+   * @param root The root of the World ID Merkle tree.
+   * @param nullifierHash The nullifier hash for the user.
+   * @param proof The ZKP (Zero-Knowledge Proof) for World ID verification.
+   */
   function registerParticipant(
     uint256 eventId,
     uint256 root,
@@ -198,7 +244,12 @@ contract EventManager {
     emit RegisteredSuccessful(eventId, msg.sender);
   }
 
-  //Set event merkle root
+  /**
+   * @notice Allows the event creator to set the Merkle root for event NFTs.
+   * @dev Only the creator of the event can set the Merkle root.
+   * @param eventId The ID of the event for which to set the Merkle root.
+   * @param _merkleRoot The new Merkle root to be set in the Event NFT contract.
+   */
   function setEventMerkleRoot(uint256 eventId, bytes32 _merkleRoot) external {
     Event storage eventData = events[eventId];
     require(msg.sender == eventData.creator, "Only event creator can set root");
@@ -206,6 +257,14 @@ contract EventManager {
     nftContract.setMerkleRoot(_merkleRoot);
   }
 
+  /**
+   * @notice Allows a participant to claim their reward after registering for an event.
+   * @dev Supports both ERC20 token rewards and NFT rewards. Ensures the participant
+   * has not claimed the reward previously and that their nullifier hash is not reused.
+   * @param eventId The ID of the event for which the reward is being claimed.
+   * @param nullifierHash The nullifier hash to prevent double claiming.
+   * @param proof The Merkle proof required for NFT reward claims.
+   */
   function claimReward(uint256 eventId, uint256 nullifierHash, bytes32[] calldata proof) external {
     require(isParticipant[eventId][msg.sender], "Not a participant");
     require(!hasClaimedReward[eventId][msg.sender], "Reward already claimed");
