@@ -32,11 +32,7 @@ contract EventRewardManager is Ownable(msg.sender) {
         uint256 indexed rewardAmount
     );
 
-    event TokenRewardUpdated(
-        uint256 indexed eventId,
-        address indexed eventManager,
-        uint256 indexed newRewardAmount
-    );
+    event TokenRewardUpdated(uint256 indexed eventId, address indexed eventManager, uint256 indexed newRewardAmount);
 
     constructor(address _eventManagerAddress) {
         eventManager = EventManager(_eventManagerAddress);
@@ -53,12 +49,10 @@ contract EventRewardManager is Ownable(msg.sender) {
     }
 
     // Create token-based event rewards
-    function createTokenReward(
-        uint256 _eventId,
-        TokenType _tokenType,
-        address _tokenAddress,
-        uint256 _rewardAmount
-    ) external onlyOwner {
+    function createTokenReward(uint256 _eventId, TokenType _tokenType, address _tokenAddress, uint256 _rewardAmount)
+        external
+        onlyOwner
+    {
         checkZeroAddress();
 
         checkEventIsValid(_eventId);
@@ -80,18 +74,9 @@ contract EventRewardManager is Ownable(msg.sender) {
 
         // Transfer tokens from event manager to contract
         IERC20 token = IERC20(_tokenAddress);
-        require(
-            token.transferFrom(msg.sender, address(this), _rewardAmount),
-            "Token transfer failed"
-        );
+        require(token.transferFrom(msg.sender, address(this), _rewardAmount), "Token transfer failed");
 
-        emit TokenRewardCreated(
-            _eventId,
-            msg.sender,
-            _tokenAddress,
-            _tokenType,
-            _rewardAmount
-        );
+        emit TokenRewardCreated(_eventId, msg.sender, _tokenAddress, _tokenType, _rewardAmount);
     }
 
     // Update token-based event reward amount
@@ -102,47 +87,39 @@ contract EventRewardManager is Ownable(msg.sender) {
 
         TokenReward storage eventReward = eventTokenRewards[_eventId];
 
-        if (eventReward.eventManager != msg.sender)
+        if (eventReward.eventManager != msg.sender) {
             revert("Only event manager allowed");
+        }
 
         eventReward.rewardAmount += _amount;
 
         IERC20 token = IERC20(eventReward.tokenAddress);
-        require(
-            token.transferFrom(msg.sender, address(this), _amount),
-            "Token transfer failed"
-        );
+        require(token.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
 
         emit TokenRewardUpdated(_eventId, msg.sender, _amount);
     }
 
     // Function to distribute tokens to event participants
-    function distributeTokenReward(
-        uint256 _eventId,
-        address _recipient,
-        uint256 _participantReward
-    ) external onlyOwner {
+    function distributeTokenReward(uint256 _eventId, address _recipient, uint256 _participantReward)
+        external
+        onlyOwner
+    {
         checkEventIsValid(_eventId);
 
         TokenReward storage eventReward = eventTokenRewards[_eventId];
 
-        if (
-            eventReward.tokenType != TokenType.USDC &&
-            eventReward.tokenType == TokenType.WLD
-        ) {
+        if (eventReward.tokenType != TokenType.USDC && eventReward.tokenType == TokenType.WLD) {
             revert("No event token reward");
         }
 
-        if (_participantReward > eventReward.rewardAmount)
+        if (_participantReward > eventReward.rewardAmount) {
             revert("Insufficient reward amount");
+        }
 
         eventReward.rewardAmount -= _participantReward;
 
         // Transfer tokens to participant
         IERC20 token = IERC20(eventReward.tokenAddress);
-        require(
-            token.transfer(_recipient, _participantReward),
-            "Token distribution failed"
-        );
+        require(token.transfer(_recipient, _participantReward), "Token distribution failed");
     }
 }

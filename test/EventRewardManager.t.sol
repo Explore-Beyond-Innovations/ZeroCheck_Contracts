@@ -40,28 +40,15 @@ contract EventRewardManagerTest is Test {
         // Test event emitted as expected
         vm.expectEmit(true, true, true, true);
         emit EventRewardManager.TokenRewardCreated(
-            eventId,
-            address(this),
-            address(usdcToken),
-            EventRewardManager.TokenType.USDC,
-            rewardAmount
+            eventId, address(this), address(usdcToken), EventRewardManager.TokenType.USDC, rewardAmount
         );
 
         // Create the token reward
-        rewardManager.createTokenReward(
-            eventId,
-            EventRewardManager.TokenType.USDC,
-            address(usdcToken),
-            rewardAmount
-        );
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount);
 
         // Verify the updated reward amount
-        (
-            address manager,
-            address tokenAddress,
-            EventRewardManager.TokenType tokenType,
-            uint256 eventRewardAmount
-        ) = rewardManager.eventTokenRewards(eventId);
+        (address manager, address tokenAddress, EventRewardManager.TokenType tokenType, uint256 eventRewardAmount) =
+            rewardManager.eventTokenRewards(eventId);
 
         assert(manager == owner);
         assert(tokenType == EventRewardManager.TokenType.USDC);
@@ -72,34 +59,19 @@ contract EventRewardManagerTest is Test {
     function testCreateTokenRewardZeroAddress() public {
         // Attempt to create a token reward with a zero address
         vm.expectRevert("Zero token address detected");
-        rewardManager.createTokenReward(
-            eventId,
-            EventRewardManager.TokenType.USDC,
-            address(0),
-            rewardAmount
-        );
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(0), rewardAmount);
     }
 
     function testCreateTokenRewardZeroAmount() public {
         // Attempt to create a token reward with a zero reward amount
         vm.expectRevert("Zero amount detected");
-        rewardManager.createTokenReward(
-            eventId,
-            EventRewardManager.TokenType.USDC,
-            address(usdcToken),
-            0
-        );
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(usdcToken), 0);
     }
 
     function testCreateTokenRewardInvalidTokenType() public {
         // Attempt to create a token reward with an invalid token type
         vm.expectRevert("Invalid token type");
-        rewardManager.createTokenReward(
-            eventId,
-            EventRewardManager.TokenType.NFT,
-            address(usdcToken),
-            rewardAmount
-        );
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.NFT, address(usdcToken), rewardAmount);
     }
 
     function testCreateTokenRewardEventDoesNotExist() public {
@@ -108,10 +80,7 @@ contract EventRewardManagerTest is Test {
         // Attempt to create a token reward for a non-existent event
         vm.expectRevert("Event does not exist");
         rewardManager.createTokenReward(
-            invalidEventId,
-            EventRewardManager.TokenType.USDC,
-            address(usdcToken),
-            rewardAmount
+            invalidEventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
         );
     }
 
@@ -119,12 +88,7 @@ contract EventRewardManagerTest is Test {
         uint256 additionalReward = 500 * 10 ** 6;
 
         // Create initial event token reward
-        rewardManager.createTokenReward(
-            eventId,
-            EventRewardManager.TokenType.USDC,
-            address(usdcToken),
-            rewardAmount
-        );
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount);
 
         // Mint more tokens to update event reward
         usdcToken.mint(address(this), additionalReward);
@@ -132,22 +96,14 @@ contract EventRewardManagerTest is Test {
 
         // Test event emitted as expected
         vm.expectEmit(true, true, true, true);
-        emit EventRewardManager.TokenRewardUpdated(
-            eventId,
-            address(this),
-            additionalReward
-        );
+        emit EventRewardManager.TokenRewardUpdated(eventId, address(this), additionalReward);
 
         // Update the token reward amount
         rewardManager.updateTokenReward(eventId, additionalReward);
 
         // Verify the updated reward amount
-        (
-            address manager,
-            address tokenAddress,
-            EventRewardManager.TokenType tokenType,
-            uint256 eventRewardAmount
-        ) = rewardManager.eventTokenRewards(eventId);
+        (address manager, address tokenAddress, EventRewardManager.TokenType tokenType, uint256 eventRewardAmount) =
+            rewardManager.eventTokenRewards(eventId);
 
         assert(manager == owner);
         assert(tokenAddress == address(usdcToken));
@@ -158,12 +114,7 @@ contract EventRewardManagerTest is Test {
     function testUpdateTokenRewardOnlyEventManager() public {
         uint256 additionalReward = 500 * 10 ** 6;
 
-        rewardManager.createTokenReward(
-            eventId,
-            EventRewardManager.TokenType.USDC,
-            address(usdcToken),
-            rewardAmount
-        );
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount);
 
         // Attempt to update the token reward from a different address
         address nonManager = address(0x666);
@@ -185,19 +136,10 @@ contract EventRewardManagerTest is Test {
         uint256 initialReward = 1000 * 10 ** 6;
         uint256 participantReward = 100 * 10 ** 6;
 
-        rewardManager.createTokenReward(
-            eventId,
-            EventRewardManager.TokenType.USDC,
-            address(usdcToken),
-            initialReward
-        );
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(usdcToken), initialReward);
 
         // Distribute reward to participant
-        rewardManager.distributeTokenReward(
-            eventId,
-            participant,
-            participantReward
-        );
+        rewardManager.distributeTokenReward(eventId, participant, participantReward);
 
         // Verify participant received correct token amount
         assert(usdcToken.balanceOf(participant) == participantReward);
@@ -207,39 +149,21 @@ contract EventRewardManagerTest is Test {
         uint256 invalidEventId = 1111;
         uint256 participantReward = 100 * 10 ** 6;
 
-        rewardManager.createTokenReward(
-            eventId,
-            EventRewardManager.TokenType.USDC,
-            address(usdcToken),
-            rewardAmount
-        );
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount);
 
         // Attempt to distribute tokens for an event that does not exist
         vm.expectRevert("Event does not exist");
-        rewardManager.distributeTokenReward(
-            invalidEventId,
-            participant,
-            participantReward
-        );
+        rewardManager.distributeTokenReward(invalidEventId, participant, participantReward);
     }
 
     function testDistributeTokenRewardInsufficientRewardAmount() public {
         uint256 participantReward = 1100 * 10 ** 6;
 
-        rewardManager.createTokenReward(
-            eventId,
-            EventRewardManager.TokenType.USDC,
-            address(usdcToken),
-            rewardAmount
-        );
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount);
 
         // Attempt to distribute more tokens than available in contract
         vm.expectRevert("Insufficient reward amount");
-        rewardManager.distributeTokenReward(
-            eventId,
-            participant,
-            participantReward
-        );
+        rewardManager.distributeTokenReward(eventId, participant, participantReward);
     }
 }
 
@@ -271,16 +195,9 @@ contract MockERC20 {
         return true;
     }
 
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
         require(balanceOf[sender] >= amount, "Insufficient balance");
-        require(
-            allowance[sender][msg.sender] >= amount,
-            "Insufficient allowance"
-        );
+        require(allowance[sender][msg.sender] >= amount, "Insufficient allowance");
 
         balanceOf[sender] -= amount;
         balanceOf[recipient] += amount;
