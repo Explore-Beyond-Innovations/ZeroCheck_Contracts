@@ -129,9 +129,6 @@ contract EventRewardManager is Ownable {
     }
 
     eventReward.rewardAmount -= _participantReward;
-
-    // Transfer tokens to participant
-    IERC20 token = IERC20(eventReward.tokenAddress);
-    require(token.transfer(_recipient, _participantReward), "Token distribution failed");
+    userRewards[_eventId][_recipient] += _participantReward;
   }
 }
