@@ -131,4 +131,12 @@ contract EventRewardManager is Ownable {
     eventReward.rewardAmount -= _participantReward;
     userRewards[_eventId][_recipient] += _participantReward;
   }
+
+  function getUserReward(uint256 _eventId, address _user) external view returns (uint256) {
+    checkEventIsValid(_eventId);
+
+    require(_user != address(0), "Zero Address Detected");
+
+    return userRewards[_eventId][_user];
+  }
 }
