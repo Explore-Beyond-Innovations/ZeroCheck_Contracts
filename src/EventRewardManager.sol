@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import { IERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Ownable } from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import { ReentrancyGuard } from "../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import "../src/EventManager.sol";
 
 contract EventRewardManager is Ownable {
@@ -23,8 +24,8 @@ contract EventRewardManager is Ownable {
   }
 
   mapping(uint256 => TokenReward) public eventTokenRewards;
-  mapping(uint256 => mapping(address => uint256)) public userRewards;
-  mapping(uint256 => mapping(address => bool)) public hasClaimedReward;
+  mapping(uint256 => mapping(address => uint256)) public userTokenRewards;
+  mapping(uint256 => mapping(address => bool)) public hasClaimedTokenReward;
 
   event TokenRewardCreated(
     uint256 indexed eventId,
@@ -130,14 +131,31 @@ contract EventRewardManager is Ownable {
     }
 
     eventReward.rewardAmount -= _participantReward;
-    userRewards[_eventId][_recipient] += _participantReward;
+    userTokenRewards[_eventId][_recipient] += _participantReward;
   }
 
-  function getUserReward(uint256 _eventId, address _user) external view returns (uint256) {
+  function getUserTokenReward(uint256 _eventId, address _user) external view returns (uint256) {
     checkEventIsValid(_eventId);
 
     require(_user != address(0), "Zero Address Detected");
 
-    return userRewards[_eventId][_user];
+    return userTokenRewards[_eventId][_user];
+  }
+
+  function claimTokenReward(uint256 _eventId) external nonReentrant {
+    checkEventIsValid(_eventId);
+
+    uint256 rewardAmount = userTokenRewards[_eventId][msg.sender];
+    require(rewardAmount > 0, "No reward to claim");
+    require(!hasClaimedTokenReward[_eventId][msg.sender], "Reward already claimed");
+
+    TokenReward storage eventReward = eventTokenRewards[_eventId];
+    require(eventReward.tokenAddress != address(0), "Invalid token address");
+
+    userTokenRewards[_eventId][msg.sender] = 0;
+    hasClaimedTokenReward[_eventId][msg.sender] = true;
+
+    IERC20 token = IERC20(eventReward.tokenAddress);
+    require(token.transfer(msg.sender, rewardAmount), "Token transfer failed");
   }
 }
