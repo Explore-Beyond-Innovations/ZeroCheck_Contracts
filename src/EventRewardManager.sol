@@ -23,6 +23,7 @@ contract EventRewardManager is Ownable {
   }
 
   mapping(uint256 => TokenReward) public eventTokenRewards;
+  mapping(uint256 => mapping(address => uint256)) public userRewards;
 
   event TokenRewardCreated(
     uint256 indexed eventId,
