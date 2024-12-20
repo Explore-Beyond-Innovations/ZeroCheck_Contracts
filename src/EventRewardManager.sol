@@ -40,13 +40,9 @@ contract EventRewardManager is Ownable {
     uint256 indexed eventId, address indexed eventManager, uint256 indexed newRewardAmount
   );
 
-  event TokenRewardDistributed(
-    uint256 indexed eventId, address indexed recipient, uint256 amount
-  );
+  event TokenRewardDistributed(uint256 indexed eventId, address indexed recipient, uint256 amount);
 
-  event TokenRewardClaimed(
-    uint256 indexed eventId, address indexed recipient, uint256 amount
-  );
+  event TokenRewardClaimed(uint256 indexed eventId, address indexed recipient, uint256 amount);
 
   constructor(address _eventManagerAddress) Ownable(msg.sender) {
     eventManager = EventManager(_eventManagerAddress);
