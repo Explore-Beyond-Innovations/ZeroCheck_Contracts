@@ -371,7 +371,7 @@ contract EventRewardManagerTest is Test {
     vm.expectRevert("Not a registered participant");
     rewardManager.claimTokenReward(eventId);
   }
-  
+
   function testFailDoubleClaimTokenReward() public {
     rewardManager.createTokenReward(
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount

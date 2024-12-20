@@ -210,7 +210,7 @@ contract EventRewardManager is Ownable {
 
     EventManager.Event memory event_ = eventManager.getEvent(_eventId);
     bool isParticipant = false;
-    for (uint i = 0; i < event_.participants.length; i++) {
+    for (uint256 i = 0; i < event_.participants.length; i++) {
       if (event_.participants[i] == msg.sender) {
         isParticipant = true;
         break;
