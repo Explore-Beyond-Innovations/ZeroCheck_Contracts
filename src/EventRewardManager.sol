@@ -24,6 +24,9 @@ contract EventRewardManager is Ownable {
 
   mapping(uint256 => TokenReward) public eventTokenRewards;
 
+  //Minimum wait time required before the unclaimed reward withdrawal operation can be performed
+  uint256 public constant WITHDRAWAL_TIMEOUT = 30 days;
+
   event TokenRewardCreated(
     uint256 indexed eventId,
     address indexed eventManager,
@@ -34,6 +37,14 @@ contract EventRewardManager is Ownable {
 
   event TokenRewardUpdated(
     uint256 indexed eventId, address indexed eventManager, uint256 indexed newRewardAmount
+  );
+
+  event TokenRewardWithdrawn(
+    uint256 indexed eventId, address indexed eventManager, uint256 indexed amount
+  );
+
+  event TokenRewardCancelled(
+    uint256 indexed eventId, address indexed eventManager, uint256 indexed amount
   );
 
   constructor(address _eventManagerAddress) Ownable(msg.sender) {
@@ -133,4 +144,6 @@ contract EventRewardManager is Ownable {
     IERC20 token = IERC20(eventReward.tokenAddress);
     require(token.transfer(_recipient, _participantReward), "Token distribution failed");
   }
+
+  
 }
