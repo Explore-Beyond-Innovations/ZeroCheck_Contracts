@@ -29,7 +29,8 @@ contract EventRewardManager is Ownable {
   //Minimum wait time required before the unclaimed reward withdrawal operation can be performed
   uint256 public constant WITHDRAWAL_TIMEOUT = 30 days;
 
-  event TokenRewardCreated(
+
+event TokenRewardCreated(
     uint256 indexed eventId,
     address indexed eventManager,
     address tokenAddress,
@@ -48,6 +49,14 @@ contract EventRewardManager is Ownable {
   event TokenRewardCancelled(
     uint256 indexed eventId, address indexed eventManager, uint256 indexed amount
   );
+
+  event TokenRewardDistributed(uint256 indexed eventId, address indexed recipient, uint256 amount);
+
+  event MultipleTokenRewardDistributed(
+    uint256 indexed eventId, address[] indexed recipients, uint256[] amounts
+  );
+
+  event TokenRewardClaimed(uint256 indexed eventId, address indexed recipient, uint256 amount);
 
   constructor(address _eventManagerAddress) Ownable(msg.sender) {
     eventManager = EventManager(_eventManagerAddress);
