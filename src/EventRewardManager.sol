@@ -3,7 +3,8 @@ pragma solidity ^0.8.20;
 
 import { IERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Ownable } from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-// import { ReentrancyGuard } from "../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+// import { ReentrancyGuard } from
+// "../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import "../src/EventManager.sol";
 
 contract EventRewardManager is Ownable {
@@ -142,7 +143,7 @@ contract EventRewardManager is Ownable {
     return userTokenRewards[_eventId][_user];
   }
 
-  function claimTokenReward(uint256 _eventId) external   {
+  function claimTokenReward(uint256 _eventId) external {
     checkEventIsValid(_eventId);
 
     uint256 rewardAmount = userTokenRewards[_eventId][msg.sender];
