@@ -4,9 +4,13 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import "../src/EventManager.sol";
 import "../src/interfaces/IWorldID.sol";
+import "../src/EventNFTFactory.sol";
+import "../src/EventRewardManager.sol";
 
 contract EventManagerTest is Test {
   EventManager private eventManager;
+    EventNFTFactory private nftFactory;
+    EventRewardManager private rewardManager;
 
   event ParticipantRegistered(uint256 eventId, address indexed participant);
 
@@ -15,11 +19,20 @@ contract EventManagerTest is Test {
   uint256 constant WORLD_ID_ROOT = 123_456_789;
 
   event EventRegistered(uint256 id, string description, address indexed creator);
+  event RewardCreated(
+        uint256 indexed eventId,
+        address indexed nftAddress,
+        address tokenAddress,
+        EventRewardManager.TokenType rewardType,
+        uint256 rewardAmount
+    );
 
   function setUp() public {
     eventManager =
       new EventManager(WORLD_ID_CONTRACT, WORLD_ID_ROOT, REWARD_CONTRACT, "appId", "actionId");
   }
+        nftFactory = new EventNFTFactory();
+        rewardManager = new EventRewardManager(address(this));
 
   function testEventManagerConstruction() public view {
     assertEq(address(eventManager.getWorldId()), address(WORLD_ID_CONTRACT));
@@ -195,4 +208,48 @@ contract EventManagerTest is Test {
     vm.expectRevert("Already registered as participant");
     eventManager.registerParticipant(0, nullifierHash, proof);
   }
+
+  function testCreateRewardSuccess() public {
+        // Create an event first
+        eventManager.createEvent("Test Event", "Description", block.timestamp + 1 days, "NFT+Token");
+        
+        // Prepare reward parameters
+        string memory nftName = "Event NFT";
+        string memory nftSymbol = "ENFT";
+        uint256 maxSupply = 100;
+        string memory baseURI = "ipfs://QmTest/";
+        EventRewardManager.TokenType tokenType = EventRewardManager.TokenType.USDC;
+        uint256 rewardAmount = 1000;
+
+        // Expect RewardCreated event
+        vm.expectEmit(true, true, true, true);
+        emit RewardCreated(
+            0, // eventId
+            address(0), // NFT address will be determined at runtime
+            USDC_TOKEN,
+            tokenType,
+            rewardAmount
+        );
+
+        // Create reward
+        address nftAddress = eventManager.createReward(
+            0, // eventId
+            nftName,
+            nftSymbol,
+            maxSupply,
+            baseURI,
+            tokenType,
+            USDC_TOKEN,
+            rewardAmount
+        );
+
+        // Verify reward was created correctly
+        EventManager.EventReward memory reward = eventManager.getEventReward(0);
+        assertEq(reward.nftAddress, nftAddress);
+        assertEq(reward.tokenAddress, USDC_TOKEN);
+        assertEq(uint(reward.rewardType), uint(EventRewardManager.TokenType.USDC));
+        assertEq(reward.tokenRewardAmount, rewardAmount);
+        assertTrue(reward.isActive);
+    }
+
 }

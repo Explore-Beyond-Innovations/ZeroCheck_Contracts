@@ -3,6 +3,8 @@ pragma solidity ^0.8.13;
 
 import { IWorldID } from "./interfaces/IWorldID.sol";
 import { Merkle } from "murky/src/Merkle.sol";
+import "./EventNFTFactory.sol";
+import "./EventRewardManager.sol";
 
 contract EventManager {
   ////////////////////////////////////////////////////////////////
@@ -10,6 +12,8 @@ contract EventManager {
   ////////////////////////////////////////////////////////////////
   /// @dev The address of the World ID Router contract that will be used for verifying proofs
   IWorldID internal immutable worldId;
+  EventNFTFactory public nftFactory;
+  EventRewardManager public rewardManager;
   // address public worldID;
 
   struct Event {
@@ -27,10 +31,22 @@ contract EventManager {
   string public appId;
   string public actionId;
 
+  struct EventReward {
+    address nftAddress;
+    uint256 tokenRewardAmount;
+    address tokenAddress;
+    EventRewardManager.TokenType rewardType;
+    bool isActive;
+  }
+    
+   
+    
+  event RewardCreated( uint256 indexed eventId, address indexed nftAddress, address tokenAddress, EventRewardManager.TokenType rewardType, uint256 rewardAmount);
   event ParticipantRegistered(uint256 eventId, address indexed participant);
   event MerkleRootGenerated(uint256 eventId, bytes32 merkleRoot);
 
   mapping(uint256 => mapping(address => bool)) private registeredParticipants;
+   mapping(uint256 => EventReward) public eventRewards;
 
   mapping(uint256 => Event) private events;
   uint256[] private eventIds;
@@ -52,13 +68,17 @@ contract EventManager {
     uint256 _root,
     address _rewardContract,
     string memory _appId,
-    string memory _actionId
+    string memory _actionId, 
+    address _nftFactoryAddress,
+    address _rewardManagerAddress
   ) {
     worldId = IWorldID(_worldId);
     rewardContract = _rewardContract;
     appId = _appId;
     actionId = _actionId;
     worldIdRoot = _root;
+    nftFactory = EventNFTFactory(_nftFactoryAddress);
+    rewardManager = EventRewardManager(_rewardManagerAddress);
   }
 
   ////////////////////////////////////////////////////////////////
@@ -120,6 +140,59 @@ contract EventManager {
     eventIds.push(nextEventId);
     nextEventId++;
   }
+
+// Function to create a reward
+  function createReward(
+        uint256 _eventId,
+        string memory _nftName,
+        string memory _nftSymbol,
+        uint256 _maxSupply,
+        string memory _baseURI,
+        EventRewardManager.TokenType _tokenType,
+        address _tokenAddress,
+        uint256 _rewardAmount
+    ) external returns (address nftAddress) {
+        // Check if reward already exists for this event
+        require(!eventRewards[_eventId].isActive, "Reward already exists for this event");
+        
+        // Create NFT contract through factory
+        (EventNFT newNFT, ) = nftFactory.createEventNFT(
+            _nftName,
+            _nftSymbol,
+            _maxSupply,
+            _baseURI,
+            address(this)
+        );
+        
+        // Create token reward through reward manager
+        if (_tokenType != EventRewardManager.TokenType.NONE) {
+            rewardManager.createTokenReward(
+                _eventId,
+                _tokenType,
+                _tokenAddress,
+                _rewardAmount
+            );
+        }
+        
+        // Store reward information
+        eventRewards[_eventId] = EventReward({
+            nftAddress: address(newNFT),
+            tokenRewardAmount: _rewardAmount,
+            tokenAddress: _tokenAddress,
+            rewardType: _tokenType,
+            isActive: true
+        });
+        
+        emit RewardCreated(
+            _eventId,
+            address(newNFT),
+            _tokenAddress,
+            _tokenType,
+            _rewardAmount
+        );
+        
+        return address(newNFT);
+    }
 
   // Retrieve an event by its ID
 
