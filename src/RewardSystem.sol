@@ -139,10 +139,6 @@ contract RewardSystem is Ownable {
         return userRewards[_user];
     }
     
-    function isRewardClaimed(uint256 _rewardId) external view returns (bool) {
-        return rewards[_rewardId].claimed;
-    }
-    
     function getRewardDetails(uint256 _rewardId) 
         external 
         view 
