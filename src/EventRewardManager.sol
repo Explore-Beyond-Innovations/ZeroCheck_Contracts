@@ -150,7 +150,34 @@ contract EventRewardManager is Ownable {
   }
 
   // Function to withdraw unclaimed rewards after timeout period
+  // function withdrawUnclaimedRewards(uint256 _eventId) external {
+  //   checkEventIsValid(_eventId);
+
+  //   TokenReward storage eventReward = eventTokenRewards[_eventId];
+
+  //   if (eventReward.eventManager != msg.sender) {
+  //     revert("Only event manager allowed");
+  //   }
+
+  //   if (block.timestamp < eventReward.createdAt + WITHDRAWAL_TIMEOUT) {
+  //     revert("Withdrawal timeout not reached");
+  //   }
+
+  //   if (eventReward.isCancelled) {
+  //     revert("Event reward has been cancelled");
+  //   }
+
+  //   uint256 unclaimedAmount = eventReward.rewardAmount;
+  //   eventReward.rewardAmount = 0;
+
+  //   IERC20 token = IERC20(eventReward.tokenAddress);
+  //   require(token.transfer(msg.sender, unclaimedAmount), "Token withdrawal failed");
+
+  //   emit TokenRewardWithdrawn(_eventId, msg.sender, unclaimedAmount);
+  // }
+
   function withdrawUnclaimedRewards(uint256 _eventId) external {
+    checkZeroAddress();
     checkEventIsValid(_eventId);
 
     TokenReward storage eventReward = eventTokenRewards[_eventId];
@@ -164,15 +191,44 @@ contract EventRewardManager is Ownable {
     }
 
     if (eventReward.isCancelled) {
-      revert("Event reward has been cancelled");
+      revert("Event reward already cancelled");
     }
 
-    uint256 unclaimedAmount = eventReward.rewardAmount;
+    uint256 remainingReward = eventReward.rewardAmount;
     eventReward.rewardAmount = 0;
 
     IERC20 token = IERC20(eventReward.tokenAddress);
-    require(token.transfer(msg.sender, unclaimedAmount), "Token withdrawal failed");
+    require(token.transfer(msg.sender, remainingReward), "Token withdrawal failed");
 
-    emit TokenRewardWithdrawn(_eventId, msg.sender, unclaimedAmount);
+    emit TokenRewardWithdrawn(_eventId, msg.sender, remainingReward);
   }
+
+  function cancelAndReclaimReward(uint256 _eventId) external {
+    checkZeroAddress();
+    checkEventIsValid(_eventId);
+
+    TokenReward storage eventReward = eventTokenRewards[_eventId];
+
+    if (eventReward.eventManager != msg.sender) {
+      revert("Only event manager allowed");
+    }
+
+    if (block.timestamp < eventReward.createdAt + WITHDRAWAL_TIMEOUT) {
+      revert("Cancellation timeout not reached");
+    }
+
+    if (eventReward.isCancelled) {
+      revert("Event reward already cancelled");
+    }
+
+    uint256 remainingReward = eventReward.rewardAmount;
+    eventReward.rewardAmount = 0;
+    eventReward.isCancelled = true;
+
+    IERC20 token = IERC20(eventReward.tokenAddress);
+    require(token.transfer(msg.sender, remainingReward), "Token reclaim failed");
+
+    emit TokenRewardCancelled(_eventId, msg.sender, remainingReward);
+  }
+
 }
