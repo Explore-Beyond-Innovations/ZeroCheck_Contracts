@@ -139,12 +139,60 @@ contract EventRewardManager is Ownable {
     emit TokenRewardDistributed(_eventId, _recipient, _participantReward);
   }
 
+  function distributeMultipleTokenRewards(
+    uint256 _eventId,
+    address[] calldata _recipients,
+    uint256[] calldata _participantRewards
+  )
+    external
+    onlyOwner
+  {
+    checkEventIsValid(_eventId);
+    require(_recipients.length == _participantRewards.length, "Arrays length mismatch");
+    require(_recipients.length > 0, "Empty arrays");
+
+    TokenReward storage eventReward = eventTokenRewards[_eventId];
+    require(eventReward.tokenType == TokenType.USDC || eventReward.tokenType == TokenType.WLD, "Invalid token type");
+
+    uint256 totalRewardAmount = 0;
+    for (uint256 i = 0; i < _participantRewards.length; i++) {
+      totalRewardAmount += _participantRewards[i];
+    }
+    require(totalRewardAmount <= eventReward.rewardAmount, "Insufficient reward amount");
+
+    for (uint256 i = 0; i < _recipients.length; i++) {
+      address recipient = _recipients[i];
+      uint256 rewardAmount = _participantRewards[i];
+
+      require(recipient != address(0), "Invalid recipient address");
+      require(rewardAmount > 0, "Invalid reward amount");
+
+      eventReward.rewardAmount -= rewardAmount;
+      userTokenRewards[_eventId][recipient] += rewardAmount;
+    }
+  }
+
   function getUserTokenReward(uint256 _eventId, address _user) external view returns (uint256) {
     checkEventIsValid(_eventId);
 
     require(_user != address(0), "Zero Address Detected");
 
     return userTokenRewards[_eventId][_user];
+  }
+
+  function getMultipleDistributedTokenRewards(
+    uint256 _eventId,
+    address[] calldata _participants
+  )
+    external
+    view
+    returns (uint256[] memory)
+  {
+    uint256[] memory rewards = new uint256[](_participants.length);
+    for (uint256 i = 0; i < _participants.length; i++) {
+      rewards[i] = userTokenRewards[_eventId][_participants[i]];
+    }
+    return rewards;
   }
 
   function claimTokenReward(uint256 _eventId) external {
