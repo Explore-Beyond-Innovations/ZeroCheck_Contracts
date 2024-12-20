@@ -152,18 +152,24 @@ contract EventRewardManagerTest is Test {
   }
 
   function testDistributeTokenReward() public {
-    uint256 initialReward = 1000 * 10 ** 6;
-    uint256 participantReward = 100 * 10 ** 6;
-
     rewardManager.createTokenReward(
-      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), initialReward
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+
+    uint256 distributedReward = rewardManager.getUserTokenReward(eventId, participant);
+    assertEq(distributedReward, rewardAmount);
+  }
+
+  function testRewardDistributedEvent() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
     );
 
-    // Distribute reward to participant
-    rewardManager.distributeTokenReward(eventId, participant, participantReward);
+    vm.expectEmit(true, true, false, true);
+    emit EventRewardManager.TokenRewardDistributed(eventId, participant, rewardAmount);
 
-    // Verify participant received correct token amount
-    assert(usdcToken.balanceOf(participant) == participantReward);
+    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
   }
 
   function testDistributeTokenRewardEventDoesNotExist() public {
@@ -189,6 +195,90 @@ contract EventRewardManagerTest is Test {
     // Attempt to distribute more tokens than available in contract
     vm.expectRevert("Insufficient reward amount");
     rewardManager.distributeTokenReward(eventId, participant, participantReward);
+  }
+
+  function testGetUserTokenReward() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+
+    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+
+    assertEq(rewardManager.getUserTokenReward(eventId, participant), rewardAmount);
+  }
+
+  function testGetUserTokenRewardInvalidAddress() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+
+    address zeroAddress = address(0);
+
+    vm.prank(zeroAddress);
+    vm.expectRevert("Zero Address Detected");
+
+    rewardManager.getUserTokenReward(eventId, zeroAddress);
+  }
+
+  function testGetUserTokenRewardInvalidEventId() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+
+    uint256 invalidEventId = 5;
+
+    vm.prank(participant);
+    vm.expectRevert("Event does not exist");
+
+    rewardManager.getUserTokenReward(invalidEventId, participant);
+  }
+
+  function testClaimTokenReward() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+
+    vm.prank(participant);
+    rewardManager.claimTokenReward(eventId);
+
+    uint256 userBalance = usdcToken.balanceOf(participant);
+    assertEq(userBalance, rewardAmount);
+
+    uint256 remainingReward = rewardManager.getUserTokenReward(eventId, participant);
+    assertEq(remainingReward, 0);
+  }
+
+  function testRewardClaimedEvent() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+
+    vm.expectEmit(true, true, false, true);
+    emit EventRewardManager.TokenRewardClaimed(eventId, participant, rewardAmount);
+
+    vm.prank(participant);
+    rewardManager.claimTokenReward(eventId);
+  }
+
+  function testFailDoubleClaimTokenReward() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+
+    vm.startPrank(participant);
+    rewardManager.claimTokenReward(eventId);
+    vm.expectRevert("Reward already claimed");
+    rewardManager.claimTokenReward(eventId);
+    vm.stopPrank();
+  }
+
+  function testClaimTokenRewardInvalidEventId() public {
+    vm.prank(participant);
+    vm.expectRevert("Event does not exist");
+    rewardManager.claimTokenReward(999);
   }
 }
 
