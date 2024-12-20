@@ -40,6 +40,10 @@ contract EventRewardManager is Ownable {
 
   event TokenRewardDistributed(uint256 indexed eventId, address indexed recipient, uint256 amount);
 
+  event MultipleTokenRewardDistributed(
+    uint256 indexed eventId, address indexed recipients, uint256 amounts
+  );
+
   event TokenRewardClaimed(uint256 indexed eventId, address indexed recipient, uint256 amount);
 
   constructor(address _eventManagerAddress) Ownable(msg.sender) {
@@ -150,9 +154,13 @@ contract EventRewardManager is Ownable {
     checkEventIsValid(_eventId);
     require(_recipients.length == _participantRewards.length, "Arrays length mismatch");
     require(_recipients.length > 0, "Empty arrays");
+    require(_participantRewards.length > 0, "Empty arrays");
 
     TokenReward storage eventReward = eventTokenRewards[_eventId];
-    require(eventReward.tokenType == TokenType.USDC || eventReward.tokenType == TokenType.WLD, "Invalid token type");
+    require(
+      eventReward.tokenType == TokenType.USDC || eventReward.tokenType == TokenType.WLD,
+      "Invalid token type"
+    );
 
     uint256 totalRewardAmount = 0;
     for (uint256 i = 0; i < _participantRewards.length; i++) {
@@ -169,6 +177,8 @@ contract EventRewardManager is Ownable {
 
       eventReward.rewardAmount -= rewardAmount;
       userTokenRewards[_eventId][recipient] += rewardAmount;
+
+      emit MultipleTokenRewardDistributed(_eventId, _recipients, _participantRewards);
     }
   }
 

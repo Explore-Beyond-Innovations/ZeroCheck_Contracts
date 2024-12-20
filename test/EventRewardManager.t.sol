@@ -5,31 +5,113 @@ import "forge-std/Test.sol";
 import "../src/EventManager.sol";
 import "../src/EventRewardManager.sol";
 
+contract MockWorldID is IWorldID {
+  uint256 private validRoot = 123_456_789; // Set a valid root for testing
+
+  function setValidRoot(uint256 _root) external {
+    validRoot = _root;
+  }
+
+  function verifyProof(
+    uint256 root,
+    uint256 nullifierHash,
+    uint256[8] calldata proof
+  )
+    external
+    view
+    override
+  {
+    require(root == validRoot, "Invalid root");
+    require(nullifierHash != 0, "Invalid nullifierHash");
+    // Proof validation skipped for simplicity in mock
+  }
+}
+
 contract EventRewardManagerTest is Test {
   EventManager public eventManager;
   EventRewardManager public rewardManager;
+  MockWorldID public mockWorldID;
   MockERC20 public usdcToken;
   MockERC20 public wldToken;
 
   address public owner;
   address public participant;
+  address public user1;
+  address public user2;
+  address public user3;
+
   uint256 eventId;
   uint256 rewardAmount;
 
   function setUp() public {
     owner = address(this);
     participant = address(0x1337);
+    user1 = address(0x15);
+    user2 = address(0x210);
+    user3 = address(0x315);
+
+    // Deploy the mock contract and set the valid root
+    mockWorldID = new MockWorldID();
+    mockWorldID.setValidRoot(123_456_789); // Set the expected root value
 
     usdcToken = new MockERC20("USDC", "USDC", 6);
     wldToken = new MockERC20("WLD", "WLD", 18);
 
     eventManager =
-      new EventManager(address(0x1234), 123_456_789, address(0x5678), "appId", "actionId");
+      new EventManager(address(mockWorldID), 123_456_789, address(0x5678), "appId", "actionId");
     rewardManager = new EventRewardManager(address(eventManager));
 
     // Create event for testing
     eventId = 0;
     eventManager.createEvent("Devcon 2025", "Test Event", block.timestamp + 1 days, "USDC");
+
+    vm.prank(user1);
+    eventManager.registerParticipant(
+      eventId,
+      12_345,
+      [
+        uint256(1),
+        uint256(2),
+        uint256(3),
+        uint256(4),
+        uint256(5),
+        uint256(6),
+        uint256(7),
+        uint256(8)
+      ]
+    );
+
+    vm.prank(user2);
+    eventManager.registerParticipant(
+      eventId,
+      12_346,
+      [
+        uint256(1),
+        uint256(2),
+        uint256(3),
+        uint256(4),
+        uint256(5),
+        uint256(6),
+        uint256(7),
+        uint256(8)
+      ]
+    );
+
+    vm.prank(user3);
+    eventManager.registerParticipant(
+      eventId,
+      12_347,
+      [
+        uint256(1),
+        uint256(2),
+        uint256(3),
+        uint256(4),
+        uint256(5),
+        uint256(6),
+        uint256(7),
+        uint256(8)
+      ]
+    );
 
     // Mint tokens to the test contract and approve the reward manager
     rewardAmount = 1000 * 10 ** 6; // 1000 USDC
@@ -279,6 +361,114 @@ contract EventRewardManagerTest is Test {
     vm.prank(participant);
     vm.expectRevert("Event does not exist");
     rewardManager.claimTokenReward(999);
+  }
+
+  function testDistributeMultipleTokenRewards() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+
+    address[] memory recipients = new address[](3);
+    recipients[0] = user1;
+    recipients[1] = user2;
+    recipients[2] = user3;
+
+    uint256[] memory rewards = new uint256[](3);
+    rewards[0] = 5;
+    rewards[1] = 5;
+    rewards[2] = 5;
+
+    rewardManager.distributeMultipleTokenRewards(eventId, recipients, rewards);
+
+    assertEq(rewardManager.getUserTokenReward(eventId, user1), 5, "User1 reward incorrect");
+    assertEq(rewardManager.getUserTokenReward(eventId, user2), 5, "User2 reward incorrect");
+    assertEq(rewardManager.getUserTokenReward(eventId, user3), 5, "User3 reward incorrect");
+
+    (,,, uint256 remainingReward) = rewardManager.eventTokenRewards(eventId);
+    assertEq(remainingReward, rewardAmount - 15, "Remaining reward incorrect");
+  }
+
+  function testGetMultipleDistributedTokenRewards() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+
+    address[] memory recipients = new address[](3);
+    recipients[0] = user1;
+    recipients[1] = user2;
+    recipients[2] = user3;
+
+    uint256[] memory rewards = new uint256[](3);
+    rewards[0] = 5;
+    rewards[1] = 6;
+    rewards[2] = 8;
+
+    rewardManager.distributeMultipleTokenRewards(eventId, recipients, rewards);
+
+    uint256[] memory distributedRewards =
+      rewardManager.getMultipleDistributedTokenRewards(eventId, recipients);
+
+    assertEq(distributedRewards.length, 3, "Incorrect number of rewards returned");
+    assertEq(distributedRewards[0], 5, "User1 reward incorrect");
+    assertEq(distributedRewards[1], 6, "User2 reward incorrect");
+    assertEq(distributedRewards[2], 8, "User3 reward incorrect");
+  }
+
+  function testDistributeMultipleTokenRewardsInsufficientReward() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+
+    address[] memory recipients = new address[](3);
+    recipients[0] = user1;
+    recipients[1] = user2;
+    recipients[2] = user3;
+
+    uint256[] memory rewards = new uint256[](3);
+    rewards[0] = 1_000_000_000;
+    rewards[1] = 1_000_000_000;
+    rewards[2] = 1_000_000_000;
+
+    vm.expectRevert("Insufficient reward amount");
+    rewardManager.distributeMultipleTokenRewards(eventId, recipients, rewards);
+  }
+
+  function testDistributeMultipleTokenRewardsArrayMismatch() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+
+    address[] memory recipients = new address[](3);
+    recipients[0] = user1;
+    recipients[1] = user2;
+    recipients[2] = user3;
+
+    uint256[] memory rewards = new uint256[](2);
+    rewards[0] = 5;
+    rewards[1] = 5;
+
+    vm.expectRevert("Arrays length mismatch");
+    rewardManager.distributeMultipleTokenRewards(eventId, recipients, rewards);
+  }
+
+  function testDistributedMultipleTokenRewardsEmptyArray() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+
+    address[] memory emptyRecipients = new address[](0);
+    uint256[] memory emptyRewards = new uint256[](0);
+
+    vm.expectRevert("Empty arrays");
+    rewardManager.distributeMultipleTokenRewards(eventId, emptyRecipients, emptyRewards);
+  }
+
+  function testGetMultipleDistributedTokenRewardsEmptyArray() public {
+    address[] memory emptyRecipients = new address[](0);
+    uint256[] memory emptyRewards =
+      rewardManager.getMultipleDistributedTokenRewards(eventId, emptyRecipients);
+
+    assertEq(emptyRewards.length, 0, "Empty array should be returned for empty input");
   }
 }
 
