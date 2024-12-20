@@ -20,6 +20,8 @@ contract EventRewardManager is Ownable {
     address tokenAddress;
     TokenType tokenType;
     uint256 rewardAmount;
+    uint256 createdAt;
+     bool isCancelled;
   }
 
   mapping(uint256 => TokenReward) public eventTokenRewards;
@@ -87,7 +89,9 @@ contract EventRewardManager is Ownable {
       eventManager: msg.sender,
       tokenAddress: _tokenAddress,
       tokenType: _tokenType,
-      rewardAmount: _rewardAmount
+      rewardAmount: _rewardAmount,
+      createdAt: block.timestamp,
+      isCancelled: false
     });
 
     // Transfer tokens from event manager to contract
@@ -145,5 +149,30 @@ contract EventRewardManager is Ownable {
     require(token.transfer(_recipient, _participantReward), "Token distribution failed");
   }
 
-  
+  // Function to withdraw unclaimed rewards after timeout period
+  function withdrawUnclaimedRewards(uint256 _eventId) external {
+    checkEventIsValid(_eventId);
+
+    TokenReward storage eventReward = eventTokenRewards[_eventId];
+
+    if (eventReward.eventManager != msg.sender) {
+      revert("Only event manager allowed");
+    }
+
+    if (block.timestamp < eventReward.createdAt + WITHDRAWAL_TIMEOUT) {
+      revert("Withdrawal timeout not reached");
+    }
+
+    if (eventReward.isCancelled) {
+      revert("Event reward has been cancelled");
+    }
+
+    uint256 unclaimedAmount = eventReward.rewardAmount;
+    eventReward.rewardAmount = 0;
+
+    IERC20 token = IERC20(eventReward.tokenAddress);
+    require(token.transfer(msg.sender, unclaimedAmount), "Token withdrawal failed");
+
+    emit TokenRewardWithdrawn(_eventId, msg.sender, unclaimedAmount);
+  }
 }
