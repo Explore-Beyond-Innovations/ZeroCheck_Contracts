@@ -41,7 +41,7 @@ contract EventRewardManager is Ownable {
   event TokenRewardDistributed(uint256 indexed eventId, address indexed recipient, uint256 amount);
 
   event MultipleTokenRewardDistributed(
-    uint256 indexed eventId, address indexed recipients, uint256 amounts
+    uint256 indexed eventId, address[] indexed recipients, uint256[] amounts
   );
 
   event TokenRewardClaimed(uint256 indexed eventId, address indexed recipient, uint256 amount);
@@ -207,6 +207,16 @@ contract EventRewardManager is Ownable {
 
   function claimTokenReward(uint256 _eventId) external {
     checkEventIsValid(_eventId);
+
+    EventManager.Event memory event_ = eventManager.getEvent(_eventId);
+    bool isParticipant = false;
+    for (uint i = 0; i < event_.participants.length; i++) {
+      if (event_.participants[i] == msg.sender) {
+        isParticipant = true;
+        break;
+      }
+    }
+    require(isParticipant, "Not a registered participant");
 
     uint256 rewardAmount = userTokenRewards[_eventId][msg.sender];
     require(rewardAmount > 0, "No reward to claim");

@@ -36,6 +36,7 @@ contract EventRewardManagerTest is Test {
 
   address public owner;
   address public participant;
+  address public unverifiedUser;
   address public user1;
   address public user2;
   address public user3;
@@ -64,6 +65,22 @@ contract EventRewardManagerTest is Test {
     // Create event for testing
     eventId = 0;
     eventManager.createEvent("Devcon 2025", "Test Event", block.timestamp + 1 days, "USDC");
+
+    vm.prank(participant);
+    eventManager.registerParticipant(
+      eventId,
+      12_344,
+      [
+        uint256(1),
+        uint256(2),
+        uint256(3),
+        uint256(4),
+        uint256(5),
+        uint256(6),
+        uint256(7),
+        uint256(8)
+      ]
+    );
 
     vm.prank(user1);
     eventManager.registerParticipant(
@@ -319,15 +336,15 @@ contract EventRewardManagerTest is Test {
     rewardManager.createTokenReward(
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
     );
-    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+    rewardManager.distributeTokenReward(eventId, user1, rewardAmount);
 
-    vm.prank(participant);
+    vm.prank(user1);
     rewardManager.claimTokenReward(eventId);
 
-    uint256 userBalance = usdcToken.balanceOf(participant);
+    uint256 userBalance = usdcToken.balanceOf(user1);
     assertEq(userBalance, rewardAmount);
 
-    uint256 remainingReward = rewardManager.getUserTokenReward(eventId, participant);
+    uint256 remainingReward = rewardManager.getUserTokenReward(eventId, user1);
     assertEq(remainingReward, 0);
   }
 
@@ -335,15 +352,26 @@ contract EventRewardManagerTest is Test {
     rewardManager.createTokenReward(
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
     );
-    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+    rewardManager.distributeTokenReward(eventId, user1, rewardAmount);
 
     vm.expectEmit(true, true, false, true);
-    emit EventRewardManager.TokenRewardClaimed(eventId, participant, rewardAmount);
+    emit EventRewardManager.TokenRewardClaimed(eventId, user1, rewardAmount);
 
-    vm.prank(participant);
+    vm.prank(user1);
     rewardManager.claimTokenReward(eventId);
   }
 
+  function testClaimTokenRewardInvalidParticipant() public {
+    rewardManager.createTokenReward(
+      eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
+    );
+    rewardManager.distributeTokenReward(eventId, unverifiedUser, rewardAmount);
+
+    vm.prank(unverifiedUser);
+    vm.expectRevert("Not a registered participant");
+    rewardManager.claimTokenReward(eventId);
+  }
+  
   function testFailDoubleClaimTokenReward() public {
     rewardManager.createTokenReward(
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
@@ -463,7 +491,7 @@ contract EventRewardManagerTest is Test {
     rewardManager.distributeMultipleTokenRewards(eventId, emptyRecipients, emptyRewards);
   }
 
-  function testGetMultipleDistributedTokenRewardsEmptyArray() public {
+  function testGetMultipleDistributedTokenRewardsEmptyArray() public view {
     address[] memory emptyRecipients = new address[](0);
     uint256[] memory emptyRewards =
       rewardManager.getMultipleDistributedTokenRewards(eventId, emptyRecipients);
