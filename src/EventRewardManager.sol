@@ -40,6 +40,14 @@ contract EventRewardManager is Ownable {
     uint256 indexed eventId, address indexed eventManager, uint256 indexed newRewardAmount
   );
 
+  event TokenRewardDistributed(
+    uint256 indexed eventId, address indexed recipient, uint256 amount
+  );
+
+  event TokenRewardClaimed(
+    uint256 indexed eventId, address indexed recipient, uint256 amount
+  );
+
   constructor(address _eventManagerAddress) Ownable(msg.sender) {
     eventManager = EventManager(_eventManagerAddress);
   }
@@ -133,6 +141,8 @@ contract EventRewardManager is Ownable {
 
     eventReward.rewardAmount -= _participantReward;
     userTokenRewards[_eventId][_recipient] += _participantReward;
+
+    emit TokenRewardDistributed(_eventId, _recipient, _participantReward);
   }
 
   function getUserTokenReward(uint256 _eventId, address _user) external view returns (uint256) {
@@ -158,5 +168,7 @@ contract EventRewardManager is Ownable {
 
     IERC20 token = IERC20(eventReward.tokenAddress);
     require(token.transfer(msg.sender, rewardAmount), "Token transfer failed");
+
+    emit TokenRewardClaimed(_eventId, msg.sender, rewardAmount);
   }
 }

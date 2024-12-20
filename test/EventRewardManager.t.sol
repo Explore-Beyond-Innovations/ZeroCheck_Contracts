@@ -161,6 +161,15 @@ contract EventRewardManagerTest is Test {
     assertEq(distributedReward, rewardAmount);
   }
 
+  function testRewardDistributedEvent() public {
+    rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount);
+
+    vm.expectEmit(true, true, false, true);
+    emit EventRewardManager.TokenRewardDistributed(eventId, participant, rewardAmount);
+
+    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+  }
+
   function testDistributeTokenRewardEventDoesNotExist() public {
     uint256 invalidEventId = 1111;
     uint256 participantReward = 100 * 10 ** 6;
@@ -237,6 +246,17 @@ contract EventRewardManagerTest is Test {
     uint256 remainingReward = rewardManager.getUserTokenReward(eventId, participant);
     assertEq(remainingReward, 0);
   }
+
+  function testRewardClaimedEvent() public {
+        rewardManager.createTokenReward(eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount);
+        rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+
+        vm.expectEmit(true, true, false, true);
+        emit EventRewardManager.TokenRewardClaimed(eventId, participant, rewardAmount);
+
+        vm.prank(participant);
+        rewardManager.claimTokenReward(eventId);
+    }
 
   function testFailDoubleClaimTokenReward() public {
     rewardManager.createTokenReward(
