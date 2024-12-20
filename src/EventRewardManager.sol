@@ -150,31 +150,6 @@ contract EventRewardManager is Ownable {
   }
 
   // Function to withdraw unclaimed rewards after timeout period
-  // function withdrawUnclaimedRewards(uint256 _eventId) external {
-  //   checkEventIsValid(_eventId);
-
-  //   TokenReward storage eventReward = eventTokenRewards[_eventId];
-
-  //   if (eventReward.eventManager != msg.sender) {
-  //     revert("Only event manager allowed");
-  //   }
-
-  //   if (block.timestamp < eventReward.createdAt + WITHDRAWAL_TIMEOUT) {
-  //     revert("Withdrawal timeout not reached");
-  //   }
-
-  //   if (eventReward.isCancelled) {
-  //     revert("Event reward has been cancelled");
-  //   }
-
-  //   uint256 unclaimedAmount = eventReward.rewardAmount;
-  //   eventReward.rewardAmount = 0;
-
-  //   IERC20 token = IERC20(eventReward.tokenAddress);
-  //   require(token.transfer(msg.sender, unclaimedAmount), "Token withdrawal failed");
-
-  //   emit TokenRewardWithdrawn(_eventId, msg.sender, unclaimedAmount);
-  // }
 
   function withdrawUnclaimedRewards(uint256 _eventId) external {
     checkZeroAddress();
@@ -203,6 +178,7 @@ contract EventRewardManager is Ownable {
     emit TokenRewardWithdrawn(_eventId, msg.sender, remainingReward);
   }
 
+  // Function to cancel and claim unclaimed rewards after a duration of 30 days 
   function cancelAndReclaimReward(uint256 _eventId) external {
     checkZeroAddress();
     checkEventIsValid(_eventId);

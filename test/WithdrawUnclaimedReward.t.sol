@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "./EventRewardManager.t.sol";
 
 contract WithdrawUnclaimedReward is EventRewardManagerTest {
+    // Function to test withdraw unclaim rewards 
     function testWithdrawUnclaimedRewards() public {
         //Create a token reward 
         rewardManager.createTokenReward(
@@ -23,6 +24,7 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
         assertEq(balanceAfter - balanceBefore, rewardAmount);
     }
 
+    // Function to test withdraw before the limited time 
     function testWithdrawBeforeTimeout() public {
         rewardManager.createTokenReward(
             eventId,
@@ -35,6 +37,7 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
         rewardManager.withdrawUnclaimedRewards(eventId);
     }
 
+    // Function to test cancel and reclaim rewards 
     function testCancelAndReclaimReward() public {
         rewardManager.createTokenReward(
             eventId,
@@ -57,6 +60,7 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
         assertTrue(isCancelled);
     }
 
+    // Function to test cancel and reclaim reward before the limited time
     function testCancelAndReclaimRewardBeforeTimeout() public {
         rewardManager.createTokenReward(
             eventId,
@@ -69,6 +73,7 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
         rewardManager.cancelAndReclaimReward(eventId);
     }
 
+    // Function to test cancel and reclaim reward twice
     function testCancelAndReclaimRewardTwice() public {
         rewardManager.createTokenReward(
             eventId,
