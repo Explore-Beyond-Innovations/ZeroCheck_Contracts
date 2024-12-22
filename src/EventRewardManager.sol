@@ -26,6 +26,8 @@ contract EventRewardManager is Ownable {
   }
 
   mapping(uint256 => TokenReward) public eventTokenRewards;
+  mapping(uint256 => mapping(address => uint256)) public userTokenRewards;
+  mapping(uint256 => mapping(address => bool)) public hasClaimedTokenReward;
 
   //Minimum wait time required before the unclaimed reward withdrawal operation can be performed
   uint256 public constant WITHDRAWAL_TIMEOUT = 30 days;
@@ -147,11 +149,104 @@ event TokenRewardCreated(
       revert("Insufficient reward amount");
     }
 
+    eventReward.rewardAmount -= _participantReward;
+    userTokenRewards[_eventId][_recipient] += _participantReward;
+
+    emit TokenRewardDistributed(_eventId, _recipient, _participantReward);
+  }
+
+  function distributeMultipleTokenRewards(
+    uint256 _eventId,
+    address[] calldata _recipients,
+    uint256[] calldata _participantRewards
+  )
+    external
+    onlyOwner
+  {
+    checkEventIsValid(_eventId);
+    require(_recipients.length == _participantRewards.length, "Arrays length mismatch");
+    require(_recipients.length > 0, "Empty arrays");
+    require(_participantRewards.length > 0, "Empty arrays");
+
+    TokenReward storage eventReward = eventTokenRewards[_eventId];
+    require(
+      eventReward.tokenType == TokenType.USDC || eventReward.tokenType == TokenType.WLD,
+      "Invalid token type"
+    );
+
+    uint256 totalRewardAmount = 0;
+    for (uint256 i = 0; i < _participantRewards.length; i++) {
+      totalRewardAmount += _participantRewards[i];
+    }
+    require(totalRewardAmount <= eventReward.rewardAmount, "Insufficient reward amount");
+
+    for (uint256 i = 0; i < _recipients.length; i++) {
+      address recipient = _recipients[i];
+      uint256 rewardAmount = _participantRewards[i];
+
+      require(recipient != address(0), "Invalid recipient address");
+      require(rewardAmount > 0, "Invalid reward amount");
+
+      eventReward.rewardAmount -= rewardAmount;
+      userTokenRewards[_eventId][recipient] += rewardAmount;
+
+      emit MultipleTokenRewardDistributed(_eventId, _recipients, _participantRewards);
+    }
+  }
+
+  function getUserTokenReward(uint256 _eventId, address _user) external view returns (uint256) {
+    checkEventIsValid(_eventId);
+
+    require(_user != address(0), "Zero Address Detected");
+
+    return userTokenRewards[_eventId][_user];
+  }
+
+  function getMultipleDistributedTokenRewards(
+    uint256 _eventId,
+    address[] calldata _participants
+  )
+    external
+    view
+    returns (uint256[] memory)
+  {
+    uint256[] memory rewards = new uint256[](_participants.length);
+    for (uint256 i = 0; i < _participants.length; i++) {
+      rewards[i] = userTokenRewards[_eventId][_participants[i]];
+    }
+    return rewards;
+  }
+
+  function claimTokenReward(uint256 _eventId) external {
+    checkEventIsValid(_eventId);
+
+    EventManager.Event memory event_ = eventManager.getEvent(_eventId);
+    bool isParticipant = false;
+    for (uint256 i = 0; i < event_.participants.length; i++) {
+      if (event_.participants[i] == msg.sender) {
+        isParticipant = true;
+        break;
+      }
+    }
+    require(isParticipant, "Not a registered participant");
+
+    uint256 rewardAmount = userTokenRewards[_eventId][msg.sender];
+    require(rewardAmount > 0, "No reward to claim");
+    require(!hasClaimedTokenReward[_eventId][msg.sender], "Reward already claimed");
+
+    TokenReward storage eventReward = eventTokenRewards[_eventId];
+    require(eventReward.tokenAddress != address(0), "Invalid token address");
+
+    userTokenRewards[_eventId][msg.sender] = 0;
+    hasClaimedTokenReward[_eventId][msg.sender] = true;
+
     eventReward.claimedAmount += _participantReward;
 
     // Transfer tokens to participant
     IERC20 token = IERC20(eventReward.tokenAddress);
-    require(token.transfer(_recipient, _participantReward), "Token distribution failed");
+    require(token.transfer(msg.sender, rewardAmount), "Token transfer failed");
+
+    emit TokenRewardClaimed(_eventId, msg.sender, rewardAmount);
   }
 
   // Function to withdraw unclaimed rewards after timeout period
