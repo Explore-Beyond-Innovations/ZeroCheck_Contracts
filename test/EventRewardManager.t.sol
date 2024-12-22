@@ -422,7 +422,7 @@ contract EventRewardManagerTest is Test {
     assertEq(rewardManager.getUserTokenReward(eventId, user2), 5, "User2 reward incorrect");
     assertEq(rewardManager.getUserTokenReward(eventId, user3), 5, "User3 reward incorrect");
 
-    (,,, uint256 remainingReward) = rewardManager.eventTokenRewards(eventId);
+    (,,, uint256 remainingReward,,,) = rewardManager.eventTokenRewards(eventId);
     assertEq(remainingReward, rewardAmount - 15, "Remaining reward incorrect");
   }
 

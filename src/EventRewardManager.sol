@@ -240,7 +240,7 @@ event TokenRewardCreated(
     userTokenRewards[_eventId][msg.sender] = 0;
     hasClaimedTokenReward[_eventId][msg.sender] = true;
 
-    eventReward.claimedAmount += _participantReward;
+    eventReward.claimedAmount += rewardAmount;
 
     // Transfer tokens to participant
     IERC20 token = IERC20(eventReward.tokenAddress);
@@ -269,13 +269,15 @@ event TokenRewardCreated(
     }
 
     uint256 remainingReward = eventReward.rewardAmount - eventReward.claimedAmount;
-    eventReward.rewardAmount = eventReward.claimedAmount;
     bool cancelled = false;
 
     // If no rewards have been claimed, cancel the event reward
     if (eventReward.claimedAmount == 0) {
-      eventReward.isCancelled = true;
-      cancelled = true;
+        eventReward.isCancelled = true;
+        cancelled = true;
+        eventReward.rewardAmount = 0;
+    } else {
+        eventReward.rewardAmount = eventReward.claimedAmount;
     }
 
     IERC20 token = IERC20(eventReward.tokenAddress);
