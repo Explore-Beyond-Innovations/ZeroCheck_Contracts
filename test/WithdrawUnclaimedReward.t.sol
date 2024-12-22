@@ -22,6 +22,20 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
         uint256 balanceAfter = usdcToken.balanceOf(address(this));
 
         assertEq(balanceAfter - balanceBefore, rewardAmount);
+
+        (
+            ,
+            ,
+            ,
+            uint256 eventRewardAmount,
+            ,
+            bool isCancelled,
+            uint256 claimedAmount
+        ) = rewardManager.eventTokenRewards(eventId);
+
+        assertEq(eventRewardAmount, 0, "Reward amount should be 0 after full withdrawal");
+        assertTrue(isCancelled, "Event should be cancelled after full withdrawal");
+        assertEq(claimedAmount, 0, "Claimed amount should remain 0");
     }
 
     // Function to test withdraw before the limited time 
@@ -37,8 +51,8 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
         rewardManager.withdrawUnclaimedRewards(eventId);
     }
 
-    // Function to test cancel and reclaim rewards 
-    function testCancelAndReclaimReward() public {
+    // Function to test partial withdraw unclaimed rewards
+    function testWithdrawUnclaimedRewardsPartial() public {
         rewardManager.createTokenReward(
             eventId,
             EventRewardManager.TokenType.USDC,
@@ -46,18 +60,33 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
             rewardAmount
         );
 
+        uint256 claimAmount = rewardAmount / 2;
+        rewardManager.distributeTokenReward(eventId, participant, claimAmount);
+
         // Fast forward time
         vm.warp(block.timestamp + 31 days);
 
-        uint256 balanceBefore = usdcToken.balanceOf(address(this));
-        rewardManager.cancelAndReclaimReward(eventId);
-        uint256 balanceAfter = usdcToken.balanceOf(address(this));
+        uint256 initialBalance = usdcToken.balanceOf(address(this));
 
-        assertEq(balanceAfter - balanceBefore, rewardAmount);
+        rewardManager.withdrawUnclaimedRewards(eventId);
 
-        (,,,uint256 remainingReward,,bool isCancelled) = rewardManager.eventTokenRewards(eventId);
-        assertEq(remainingReward, 0);
-        assertTrue(isCancelled);
+        uint256 finalBalance = usdcToken.balanceOf(address(this));
+
+        assertEq(finalBalance - initialBalance, rewardAmount - claimAmount, "Incorrect withdrawal amount");
+
+        (
+            ,
+            ,
+            ,
+            uint256 eventRewardAmount,
+            ,
+            bool isCancelled,
+            uint256 claimedAmount
+        ) = rewardManager.eventTokenRewards(eventId);
+
+        assertEq(eventRewardAmount, claimAmount, "Reward amount should equal claimed amount");
+        assertFalse(isCancelled, "Event should not be cancelled after partial withdrawal");
+        assertEq(claimedAmount, claimAmount, "Claimed amount should remain unchanged");
     }
 
     // Function to test cancel and reclaim reward before the limited time
@@ -69,12 +98,12 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
             rewardAmount
         );
 
-        vm.expectRevert("Cancellation timeout not reached");
-        rewardManager.cancelAndReclaimReward(eventId);
+        vm.expectRevert("Withdrawal timeout not reached");
+        rewardManager.withdrawUnclaimedRewards(eventId);
     }
 
-    // Function to test cancel and reclaim reward twice
-    function testCancelAndReclaimRewardTwice() public {
+    // Function to test withdraw unclaim rewards for someone who is not the event manager
+    function testWithdrawUnclaimedRewardsNonManager() public {
         rewardManager.createTokenReward(
             eventId,
             EventRewardManager.TokenType.USDC,
@@ -85,9 +114,9 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
         // Fast forward time
         vm.warp(block.timestamp + 31 days);
 
-        rewardManager.cancelAndReclaimReward(eventId);
-
-        vm.expectRevert("Event reward already cancelled");
-        rewardManager.cancelAndReclaimReward(eventId);
+        address nonManager = address(0x1234);
+        vm.prank(nonManager);
+        vm.expectRevert("Only event manager allowed");
+        rewardManager.withdrawUnclaimedRewards(eventId);
     }
 }

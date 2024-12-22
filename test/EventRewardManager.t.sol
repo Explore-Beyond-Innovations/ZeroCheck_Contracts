@@ -56,14 +56,17 @@ contract EventRewardManagerTest is Test {
       EventRewardManager.TokenType tokenType,
       uint256 eventRewardAmount,
       uint256 createdAt,
-      bool isCancelled
+      bool isCancelled,
+      uint256 claimedAmount
     ) = rewardManager.eventTokenRewards(eventId);
 
     assert(manager == owner);
     assert(tokenType == EventRewardManager.TokenType.USDC);
     assert(tokenAddress == address(usdcToken));
     assert(eventRewardAmount == rewardAmount);
+    assert(createdAt > 0);
     assert(!isCancelled);
+    assertEq(claimedAmount, 0);
   }
 
   function testCreateTokenRewardZeroAddress() public {
@@ -124,7 +127,8 @@ contract EventRewardManagerTest is Test {
       EventRewardManager.TokenType tokenType,
       uint256 eventRewardAmount,
       uint256 createdAt,
-      bool isCancelled
+      bool isCancelled,
+      uint256 claimedAmount
     ) = rewardManager.eventTokenRewards(eventId);
 
     
