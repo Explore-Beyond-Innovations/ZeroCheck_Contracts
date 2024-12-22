@@ -102,7 +102,7 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
         rewardManager.withdrawUnclaimedRewards(eventId);
     }
 
-    // Function to test withdraw unclaim rewards for someone who is not the event manager
+    // Function to test withdraw unclaim rewards for someone who isn't the event manager
     function testWithdrawUnclaimedRewardsNonManager() public {
         rewardManager.createTokenReward(
             eventId,

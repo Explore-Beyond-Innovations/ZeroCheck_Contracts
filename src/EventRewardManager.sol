@@ -249,7 +249,7 @@ event TokenRewardCreated(
     emit TokenRewardClaimed(_eventId, msg.sender, rewardAmount);
   }
 
-  // Function to withdraw unclaimed rewards after timeout period
+  // Function to withdraw unclaimed rewards after timeout period and cancel the event reward, if the reward have been claimed
   function withdrawUnclaimedRewards(uint256 _eventId) external {
     checkZeroAddress();
     checkEventIsValid(_eventId);
