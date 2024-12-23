@@ -63,9 +63,8 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
     (,,, uint256 eventRewardAmount,, bool isCancelled, uint256 claimedAmount) =
       rewardManager.eventTokenRewards(eventId);
 
-    assertEq(eventRewardAmount, claimAmount, "Reward amount should equal claimed amount");
-    assertFalse(isCancelled, "Event should not be cancelled after partial withdrawal");
-    assertEq(claimedAmount, claimAmount, "Claimed amount should remain unchanged");
+    assertEq(eventRewardAmount, 0, "Reward amount should be 0 after full withdrawal");
+    assertTrue(isCancelled, "Event should be cancelled after full withdrawal");
   }
 
   // Function to test cancel and reclaim reward before the limited time
