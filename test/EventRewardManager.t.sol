@@ -230,7 +230,6 @@ contract EventRewardManagerTest is Test {
       uint256 claimedAmount
     ) = rewardManager.eventTokenRewards(eventId);
 
-    
     assert(manager == owner);
     assert(tokenAddress == address(usdcToken));
     assert(tokenType == EventRewardManager.TokenType.USDC);

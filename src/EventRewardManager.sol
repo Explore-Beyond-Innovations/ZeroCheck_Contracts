@@ -32,8 +32,7 @@ contract EventRewardManager is Ownable {
   //Minimum wait time required before the unclaimed reward withdrawal operation can be performed
   uint256 public constant WITHDRAWAL_TIMEOUT = 30 days;
 
-
-event TokenRewardCreated(
+  event TokenRewardCreated(
     uint256 indexed eventId,
     address indexed eventManager,
     address tokenAddress,
@@ -45,7 +44,9 @@ event TokenRewardCreated(
     uint256 indexed eventId, address indexed eventManager, uint256 indexed newRewardAmount
   );
 
-  event TokenRewardWithdrawn(uint256 indexed eventId, address indexed eventManager, uint256 indexed amount, bool cancelled);
+  event TokenRewardWithdrawn(
+    uint256 indexed eventId, address indexed eventManager, uint256 indexed amount, bool cancelled
+  );
 
   event TokenRewardDistributed(uint256 indexed eventId, address indexed recipient, uint256 amount);
 
@@ -96,7 +97,7 @@ event TokenRewardCreated(
       tokenAddress: _tokenAddress,
       tokenType: _tokenType,
       rewardAmount: _rewardAmount,
-      claimedAmount: 0,  // Initialize claimed amount to 0
+      claimedAmount: 0, // Initialize claimed amount to 0
       createdAt: block.timestamp,
       isCancelled: false
     });
@@ -249,7 +250,8 @@ event TokenRewardCreated(
     emit TokenRewardClaimed(_eventId, msg.sender, rewardAmount);
   }
 
-  // Function to withdraw unclaimed rewards after timeout period and cancel the event reward, if the reward have been claimed
+  // Function to withdraw unclaimed rewards after timeout period and cancel the event reward, if the
+  // reward have been claimed
   function withdrawUnclaimedRewards(uint256 _eventId) external {
     checkZeroAddress();
     checkEventIsValid(_eventId);
@@ -273,11 +275,11 @@ event TokenRewardCreated(
 
     // If no rewards have been claimed, cancel the event reward
     if (eventReward.claimedAmount == 0) {
-        eventReward.isCancelled = true;
-        cancelled = true;
-        eventReward.rewardAmount = 0;
+      eventReward.isCancelled = true;
+      cancelled = true;
+      eventReward.rewardAmount = 0;
     } else {
-        eventReward.rewardAmount = eventReward.claimedAmount;
+      eventReward.rewardAmount = eventReward.claimedAmount;
     }
 
     IERC20 token = IERC20(eventReward.tokenAddress);
