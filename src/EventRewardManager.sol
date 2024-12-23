@@ -20,11 +20,17 @@ contract EventRewardManager is Ownable {
     address tokenAddress;
     TokenType tokenType;
     uint256 rewardAmount;
+    uint256 createdAt;
+    bool isCancelled;
+    uint256 claimedAmount; // This is tracking the claimed tokens
   }
 
   mapping(uint256 => TokenReward) public eventTokenRewards;
   mapping(uint256 => mapping(address => uint256)) public userTokenRewards;
   mapping(uint256 => mapping(address => bool)) public hasClaimedTokenReward;
+
+  //Minimum wait time required before the unclaimed reward withdrawal operation can be performed
+  uint256 public constant WITHDRAWAL_TIMEOUT = 30 days;
 
   event TokenRewardCreated(
     uint256 indexed eventId,
@@ -36,6 +42,10 @@ contract EventRewardManager is Ownable {
 
   event TokenRewardUpdated(
     uint256 indexed eventId, address indexed eventManager, uint256 indexed newRewardAmount
+  );
+
+  event TokenRewardWithdrawn(
+    uint256 indexed eventId, address indexed eventManager, uint256 indexed amount, bool cancelled
   );
 
   event TokenRewardDistributed(uint256 indexed eventId, address indexed recipient, uint256 amount);
@@ -86,7 +96,10 @@ contract EventRewardManager is Ownable {
       eventManager: msg.sender,
       tokenAddress: _tokenAddress,
       tokenType: _tokenType,
-      rewardAmount: _rewardAmount
+      rewardAmount: _rewardAmount,
+      claimedAmount: 0, // Initialize claimed amount to 0
+      createdAt: block.timestamp,
+      isCancelled: false
     });
 
     // Transfer tokens from event manager to contract
@@ -133,7 +146,7 @@ contract EventRewardManager is Ownable {
       revert("No event token reward");
     }
 
-    if (_participantReward > eventReward.rewardAmount) {
+    if (_participantReward > eventReward.rewardAmount - eventReward.claimedAmount) {
       revert("Insufficient reward amount");
     }
 
@@ -228,9 +241,50 @@ contract EventRewardManager is Ownable {
     userTokenRewards[_eventId][msg.sender] = 0;
     hasClaimedTokenReward[_eventId][msg.sender] = true;
 
+    eventReward.claimedAmount += rewardAmount;
+
+    // Transfer tokens to participant
     IERC20 token = IERC20(eventReward.tokenAddress);
     require(token.transfer(msg.sender, rewardAmount), "Token transfer failed");
 
     emit TokenRewardClaimed(_eventId, msg.sender, rewardAmount);
+  }
+
+  // Function to withdraw unclaimed rewards after timeout period and cancel the event reward, if the
+  // reward have been claimed
+  function withdrawUnclaimedRewards(uint256 _eventId) external {
+    checkZeroAddress();
+    checkEventIsValid(_eventId);
+
+    TokenReward storage eventReward = eventTokenRewards[_eventId];
+
+    if (eventReward.eventManager != msg.sender) {
+      revert("Only event manager allowed");
+    }
+
+    if (block.timestamp < eventReward.createdAt + WITHDRAWAL_TIMEOUT) {
+      revert("Withdrawal timeout not reached");
+    }
+
+    if (eventReward.isCancelled) {
+      revert("Event reward already cancelled");
+    }
+
+    uint256 remainingReward = eventReward.rewardAmount - eventReward.claimedAmount;
+    bool cancelled = false;
+
+    // If no rewards have been claimed, cancel the event reward
+    if (eventReward.claimedAmount == 0) {
+      eventReward.isCancelled = true;
+      cancelled = true;
+      eventReward.rewardAmount = 0;
+    } else {
+      eventReward.rewardAmount = eventReward.claimedAmount;
+    }
+
+    IERC20 token = IERC20(eventReward.tokenAddress);
+    require(token.transfer(msg.sender, remainingReward), "Token withdrawal failed");
+
+    emit TokenRewardWithdrawn(_eventId, msg.sender, remainingReward, cancelled);
   }
 }
