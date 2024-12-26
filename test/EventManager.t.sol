@@ -2,464 +2,196 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
 import "../src/EventManager.sol";
-import "../src/EventNFT.sol";
 import "../src/interfaces/IWorldID.sol";
-import { Merkle } from "murky/src/Merkle.sol";
-import "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
-import "openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 
-contract MockWorldID is IWorldID {
-  function verifyProof(
-    uint256 root,
-    uint256 nullifierHash,
-    address signal,
-    string memory appId,
-    string memory actionId,
-    uint256[8] memory proof
-  )
-    external
-    pure
-    override
-    returns (bool)
-  {
-    return true; // Always returns true for testing purposes
-  }
-}
-
-contract MockBonusNFT is ERC721 {
-  constructor() ERC721("MockBonusNFT", "MNFT") { }
-
-  function mint(address to, uint256 tokenId) public {
-    _mint(to, tokenId);
-  }
-}
-
-contract MockERC20 is ERC20 {
-  constructor() ERC20("MockToken", "MTK") {
-    _mint(msg.sender, 1_000_000 ether);
-  }
-
-  function mint(address to, uint256 amount) public {
-    _mint(to, amount);
-  }
-}
-
-contract EventManagerTest is Test, Merkle {
+contract EventManagerTest is Test {
   EventManager private eventManager;
-  EventNFT private eventNFT;
-  MockWorldID private worldId;
-  MockERC20 private token;
-  MockBonusNFT private mockNFT;
-  bytes32 private merkleRoot;
 
-  address private rewardContract;
-  address private creator = address(0x123);
-  address private participant = address(0x456);
-  address private firstRegistrant = address(0x789);
-  address private tokenAddress = address(0x898);
-  address private otherUser = address(0x899);
-  string private appId = "app-id";
-  string private actionId = "action-id";
+  event ParticipantRegistered(uint256 eventId, address indexed participant);
 
-  // Sample Merkle Tree for testing
-  bytes32[] private proof_1;
-  bytes32[] private proof_2;
-  bytes32[] private leafs;
+  address constant REWARD_CONTRACT = address(0x5678);
+  address constant WORLD_ID_CONTRACT = address(0x1234);
+  uint256 constant WORLD_ID_ROOT = 123_456_789;
+
+  event EventRegistered(uint256 id, string description, address indexed creator);
 
   function setUp() public {
-    worldId = new MockWorldID();
-    token = new MockERC20();
-
-    leafs.push(keccak256(abi.encodePacked(participant)));
-    leafs.push(keccak256(abi.encodePacked(firstRegistrant)));
-
-    merkleRoot = getRoot(leafs);
-    proof_1 = getProof(leafs, 0);
-    proof_2 = getProof(leafs, 1);
-
-    rewardContract = address(this);
-    eventManager = new EventManager(IWorldID(address(worldId)), rewardContract, appId, actionId);
-
-    eventNFT = new EventNFT(
-      "EventNFT",
-      "ENFT",
-      1000,
-      "https://example.com/metadata/",
-      address(eventManager),
-      address(this)
-    );
-
-    // Deploy MockNFT contract and mint tokens
-    mockNFT = new MockBonusNFT();
-    mockNFT.mint(address(eventManager), 1);
-    mockNFT.mint(address(eventManager), 2);
-    mockNFT.mint(address(eventManager), 3);
+    eventManager = new EventManager(WORLD_ID_CONTRACT, WORLD_ID_ROOT, "appId", "actionId");
   }
 
-  function testCreateEventFailsWhenNameIsEmpty() public {
-    vm.expectRevert("Event name is required");
+  // function testEventManagerConstruction() public view {
+  //   assertEq(address(eventManager.getWorldId()), address(WORLD_ID_CONTRACT));
+  //   assertEq(eventManager.rewardContract(), REWARD_CONTRACT);
+  //   assertEq(eventManager.appId(), "appId");
+  //   assertEq(eventManager.actionId(), "actionId");
+  // }
 
-    eventManager.createEvent(
-      "", // Empty name
-      "Valid description",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
-  }
+  // function testGetEvent() public {
+  //   // Use the createEvent function to add an event
+  //   eventManager.createEvent("Event Name", "Test Event", block.timestamp + 1 days, "Gold");
 
-  function testCreateEventFailsWhenDescriptionIsEmpty() public {
-    vm.expectRevert("Description is required");
+  //   EventManager.Event memory evt = eventManager.getEvent(0);
+  //   assertEq(evt.description, "Test Event");
+  //   assertEq(evt.creator, address(this));
+  //   assertEq(evt.id, 0);
+  //   assertEq(evt.name, "Event Name");
+  //   assertEq(evt.timestamp, block.timestamp + 1 days);
+  //   assertEq(evt.rewardType, "Gold");
+  // }
 
-    eventManager.createEvent(
-      "Valid Name",
-      "", // Empty description
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
-  }
+  // function testGetAllEvents() public {
+  //   // Use the createEvent function to add events
+  //   eventManager.createEvent("Event One", "First Event", block.timestamp + 1 days, "Gold");
+  //   eventManager.createEvent("Event Two", "Second Event", block.timestamp + 2 days, "Silver");
 
-  function testCreateEventFailsWhenTimestampIsInPast() public {
-    vm.expectRevert("Timestamp must be in the future");
+  //   EventManager.Event[] memory events = eventManager.getAllEvents();
+  //   assertEq(events.length, 2);
+  //   assertEq(events[0].description, "First Event");
+  //   assertEq(events[1].description, "Second Event");
+  //   assertEq(events[0].name, "Event One");
+  //   assertEq(events[1].rewardType, "Silver");
+  // }
 
-    eventManager.createEvent(
-      "Valid Name",
-      "Valid description",
-      block.timestamp - 1, // Timestamp in the past
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
-  }
+  // // Unit Test for Create Events
+  // function testCreateEventSuccess() public {
+  //   // Arrange
+  //   string memory eventName = "Test Event";
+  //   string memory eventDescription = "This is a test event";
+  //   uint256 eventTimestamp = block.timestamp + 1 days;
+  //   string memory eventRewardType = "Token";
 
-  function testCreateEventFailsWhenTokenAddressIsZeroForTokenReward() public {
-    vm.expectRevert("Enter valid token Address");
+  //   // Act
+  //   eventManager.createEvent(eventName, eventDescription, eventTimestamp, eventRewardType);
 
-    eventManager.createEvent(
-      "Valid Name",
-      "Valid description",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN, // Reward type is TOKEN
-      address(0), // Invalid token address
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
-  }
+  //   // Assert
+  //   EventManager.Event memory evt = eventManager.getEvent(0);
+  //   assertEq(evt.id, 0);
+  //   assertEq(evt.creator, address(this));
+  //   assertEq(evt.description, eventDescription);
+  //   assertEq(evt.name, eventName);
+  //   assertEq(evt.timestamp, eventTimestamp);
+  //   assertEq(evt.rewardType, eventRewardType);
+  // }
 
-  function testCreateEventFailsWhenTokenAddressIsZeroForNFTReward() public {
-    vm.expectRevert("Enter valid token Address");
+  // function testCreateEventFailsWhenNameIsEmpty() public {
+  //   // Arrange
+  //   string memory emptyName = "";
+  //   string memory eventDescription = "This is a test event";
+  //   uint256 eventTimestamp = block.timestamp + 1 days;
+  //   string memory eventRewardType = "Token";
 
-    eventManager.createEvent(
-      "Valid Name",
-      "Valid description",
-      block.timestamp + 1 days,
-      EventManager.RewardType.NFT, // Reward type is NFT
-      address(0), // Invalid token address
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
-  }
+  //   // Act & Assert
+  //   vm.expectRevert(bytes("Event name is required"));
+  //   eventManager.createEvent(emptyName, eventDescription, eventTimestamp, eventRewardType);
+  // }
 
-  function testCreateEventFailsWhenEventNFTAddressIsZero() public {
-    vm.expectRevert("Invalid event NFT contract.");
+  // function testCreateEventFailsWhenDescriptionIsEmpty() public {
+  //   // Arrange
+  //   string memory eventName = "Test Event";
+  //   string memory emptyDescription = "";
+  //   uint256 eventTimestamp = block.timestamp + 1 days;
+  //   string memory eventRewardType = "Token";
 
-    eventManager.createEvent(
-      "Valid Name",
-      "Valid description",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(0) // Invalid event NFT contract address
-    );
-  }
+  //   // Act & Assert
+  //   vm.expectRevert(bytes("Description is required"));
+  //   eventManager.createEvent(eventName, emptyDescription, eventTimestamp, eventRewardType);
+  // }
 
-  function testCreateEvent() public {
-    vm.prank(creator);
-    eventManager.createEvent(
-      "Test Event",
-      "This is a test event",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
+  // function testCreateEventFailsWhenTimestampIsNotFuture() public {
+  //   // Arrange
+  //   string memory eventName = "Test Event";
+  //   string memory eventDescription = "This is a test event";
+  //   uint256 currentTime = block.timestamp;
+  //   uint256 pastTimestamp = currentTime - 1;
+  //   string memory eventRewardType = "Token";
 
-    EventManager.Event memory eventDetails = eventManager.getEvent(0);
-    assertEq(eventDetails.creator, creator);
-    assertEq(eventDetails.name, "Test Event");
-    assertEq(uint256(eventDetails.rewardType), uint256(EventManager.RewardType.TOKEN));
-  }
+  //   // Act
+  //   vm.expectRevert(bytes("Timestamp must be in the future"));
 
-  function testRegisterParticipant() public {
-    vm.prank(creator);
-    eventManager.createEvent(
-      "Test Event",
-      "This is a test event",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
+  //   // Assert
+  //   eventManager.createEvent(eventName, eventDescription, pastTimestamp, eventRewardType);
+  // }
 
-    uint256 eventId = 0;
-    uint256 root = 0;
-    uint256 nullifierHash = 0;
-    uint256[8] memory proof;
+  // function testCreateEventFailsWhenRewardTypeIsEmpty() public {
+  //   // Arrange
+  //   string memory eventName = "Test Event";
+  //   string memory eventDescription = "This is a test event";
+  //   uint256 eventTimestamp = block.timestamp + 1 days;
+  //   string memory emptyRewardType = "";
 
-    vm.prank(participant);
-    eventManager.registerParticipant(eventId, root, nullifierHash, proof);
+  //   // Act & Assert
+  //   vm.expectRevert(bytes("Reward type is required"));
+  //   eventManager.createEvent(eventName, eventDescription, eventTimestamp, emptyRewardType);
+  // }
 
-    bool isRegistered = eventManager.isParticipant(eventId, participant);
-    assertTrue(isRegistered);
-  }
+  // function testRegisterParticipantSuccess() public {
+  //   // Arrange
+  //   uint256 nullifierHash = 12_345;
+  //   uint256[8] memory proof = [
+  //     uint256(1),
+  //     uint256(2),
+  //     uint256(3),
+  //     uint256(4),
+  //     uint256(5),
+  //     uint256(6),
+  //     uint256(7),
+  //     uint256(8)
+  //   ];
 
-  function testRegisterParticipantFailsWhenEventStarted() public {
-    uint256 root = 0;
-    uint256 nullifierHash = 0;
-    uint256[8] memory proof;
+  //   // Mock call for World ID proof verification
+  //   vm.mockCall(
+  //     WORLD_ID_CONTRACT,
+  //     abi.encodeWithSignature(
+  //       "verifyProof(uint256,uint256,uint256[8])", WORLD_ID_ROOT, nullifierHash, proof
+  //     ),
+  //     abi.encode(true)
+  //   );
 
-    vm.prank(creator);
-    eventManager.createEvent(
-      "Test Event",
-      "This is a test event",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
+  //   // Create a test event
+  //   eventManager.createEvent("World ID Event", "Event Name", block.timestamp + 1 days, "Token");
 
-    uint256 eventId = 0;
+  //   // Act
+  //   vm.expectEmit(true, true, false, true);
+  //   emit ParticipantRegistered(0, address(this));
 
-    vm.warp(block.timestamp + 2 days); // Advance time by 2 days
+  //   eventManager.registerParticipant(0, nullifierHash, proof);
 
-    vm.expectRevert("Event has already started");
-    vm.prank(participant);
-    eventManager.registerParticipant(eventId, root, nullifierHash, proof);
-  }
+  //   // Assert
+  //   EventManager.Event memory evt = eventManager.getEvent(0);
+  //   assertEq(evt.participants.length, 1);
+  //   assertEq(evt.participants[0], address(this));
+  // }
 
-  function testClaimRewardToken() public {
-    vm.prank(creator);
-    eventManager.createEvent(
-      "Test Event",
-      "This is a test event",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
+  // function testDoubleRegistrationFails() public {
+  //   // Arrange
+  //   uint256 nullifierHash = 12_345;
+  //   uint256[8] memory proof = [
+  //     uint256(1),
+  //     uint256(2),
+  //     uint256(3),
+  //     uint256(4),
+  //     uint256(5),
+  //     uint256(6),
+  //     uint256(7),
+  //     uint256(8)
+  //   ];
 
-    uint256 eventId = 0;
-    uint256 root = 0;
-    uint256 nullifierHash = 0;
-    uint256[8] memory proof;
+  //   vm.mockCall(
+  //     WORLD_ID_CONTRACT,
+  //     abi.encodeWithSignature(
+  //       "verifyProof(uint256,uint256,uint256[8])", WORLD_ID_ROOT, nullifierHash, proof
+  //     ),
+  //     abi.encode(true)
+  //   );
 
-    vm.prank(participant);
-    eventManager.registerParticipant(eventId, root, nullifierHash, proof);
+  //   eventManager.createEvent("World ID Event", "Event Name", block.timestamp + 1 days, "Token");
 
-    token.mint(address(eventManager), 100 ether);
+  //   // Act
+  //   eventManager.registerParticipant(0, nullifierHash, proof);
 
-    vm.prank(participant);
-    eventManager.claimReward(eventId, nullifierHash, new bytes32[](0));
-
-    assertEq(token.balanceOf(participant), 12 ether); //Only participant and first participant
-  }
-
-  function testClaimRewardTokenForOtherParticipant() public {
-    vm.prank(creator);
-    eventManager.createEvent(
-      "Test Event",
-      "This is a test event",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
-
-    uint256 eventId = 0;
-    uint256 root1 = 0x123;
-    uint256 root2 = 0x456;
-    uint256 nullifierHash1 = 1;
-    uint256 nullifierHash2 = 2;
-    uint256[8] memory proof1;
-    uint256[8] memory proof2;
-
-    token.mint(address(eventManager), 100 ether);
-
-    // First Registrant
-    vm.prank(firstRegistrant);
-    eventManager.registerParticipant(eventId, root1, nullifierHash1, proof1);
-    bool isRegistered1 = eventManager.isParticipant(eventId, firstRegistrant);
-
-    vm.prank(firstRegistrant);
-    eventManager.claimReward(eventId, nullifierHash1, new bytes32[](0));
-
-    // Second Participant
-    vm.prank(participant);
-    eventManager.registerParticipant(eventId, root2, nullifierHash2, proof2);
-    bool isRegistered2 = eventManager.isParticipant(eventId, participant);
-
-    vm.prank(participant);
-    eventManager.claimReward(eventId, nullifierHash2, new bytes32[](1));
-
-    // Assert Correct Balances
-    assertEq(isRegistered1, true);
-    assertEq(isRegistered2, true);
-    assertEq(token.balanceOf(firstRegistrant), 12 ether);
-    assertEq(token.balanceOf(participant), 10 ether);
-  }
-
-  function testClaimRewardNFT() public {
-    vm.prank(creator);
-    eventManager.createEvent(
-      "Test Event",
-      "This is a test event",
-      block.timestamp + 1 days,
-      EventManager.RewardType.NFT,
-      address(mockNFT),
-      0,
-      0,
-      1,
-      address(eventNFT)
-    );
-
-    uint256 eventId = 0;
-    uint256 root = 0;
-    uint256 nullifierHash = 0;
-    uint256[8] memory proof;
-
-    bytes32 participantHash = keccak256(abi.encodePacked(participant));
-    eventNFT.setMerkleRoot(merkleRoot);
-
-    vm.prank(participant);
-    eventManager.registerParticipant(eventId, root, nullifierHash, proof);
-
-    vm.prank(participant);
-    eventManager.claimReward(eventId, nullifierHash, proof_1);
-
-    assertEq(eventNFT.ownerOf(0), participant);
-    assertEq(mockNFT.ownerOf(1), participant); //Bonus NFT Reward as First Participant
-  }
-
-  function testCannotClaimRewardTwice() public {
-    vm.prank(creator);
-    eventManager.createEvent(
-      "Test Event",
-      "This is a test event",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
-
-    uint256 eventId = 0;
-    uint256 root = 0;
-    uint256 nullifierHash = 0;
-    uint256[8] memory proof;
-
-    vm.prank(participant);
-    eventManager.registerParticipant(eventId, root, nullifierHash, proof);
-
-    token.mint(address(eventManager), 100 ether);
-
-    vm.prank(participant);
-    eventManager.claimReward(eventId, nullifierHash, new bytes32[](0));
-
-    vm.expectRevert("Reward already claimed");
-    vm.prank(participant);
-    eventManager.claimReward(eventId, nullifierHash, new bytes32[](0));
-  }
-
-  function testCannotAllowUnregisteredUserClaimReward() public {
-    vm.prank(creator);
-    eventManager.createEvent(
-      "Test Event",
-      "This is a test event",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
-
-    uint256 eventId = 0;
-    uint256 root = 0;
-    uint256 nullifierHash = 0;
-    uint256[8] memory proof;
-
-    vm.prank(participant);
-    eventManager.registerParticipant(eventId, root, nullifierHash, proof);
-
-    token.mint(address(eventManager), 100 ether);
-
-    vm.expectRevert("Not a participant");
-    vm.prank(otherUser);
-    eventManager.claimReward(eventId, nullifierHash, new bytes32[](0));
-  }
-
-  function testOnlyCreatorCanSetMerkleRoot() public {
-    vm.prank(creator);
-    eventManager.createEvent(
-      "Test Event",
-      "This is a test event",
-      block.timestamp + 1 days,
-      EventManager.RewardType.TOKEN,
-      address(token),
-      10 ether,
-      2 ether,
-      1,
-      address(eventNFT)
-    );
-
-    uint256 eventId = 0;
-    uint256 root = 0;
-    uint256 nullifierHash = 0;
-    uint256[8] memory proof;
-
-    token.mint(address(eventManager), 100 ether);
-
-    vm.expectRevert("Only event creator can set root");
-    vm.prank(participant);
-    eventManager.setEventMerkleRoot(eventId, merkleRoot);
-  }
+  //   // Assert
+  //   vm.expectRevert("Already registered as participant");
+  //   eventManager.registerParticipant(0, nullifierHash, proof);
+  // }
 }

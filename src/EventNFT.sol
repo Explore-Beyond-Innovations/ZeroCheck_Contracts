@@ -70,6 +70,15 @@ contract EventNFT is ERC721, Ownable {
     _safeMint(participant, tokenId);
   }
 
+  function claimNFTWithZk(address participant) external onlyEventContract {
+    require(_nextTokenId < maxSupply, "Max supply reached");
+
+    claimed[participant] = true;
+
+    uint256 tokenId = _nextTokenId++;
+    _safeMint(participant, tokenId);
+  }
+
   function setBaseURI(string memory baseURI) external onlyOwner {
     _baseTokenURI = baseURI;
   }

@@ -20,4 +20,6 @@ interface IEventNFT {
   function merkleRoot() external view returns (bytes32);
 
   function claimed(address participant) external view returns (bool);
+
+  function claimNFTWithZk(address participant) external;
 }

@@ -1,305 +1,333 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import { IWorldID } from "./interfaces/IWorldID.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IWorldID} from "./interfaces/IWorldID.sol";
 import "./interfaces/IEventNFT.sol";
+import "./interfaces/IEventRewardManager.sol";
 
 contract EventManager {
-  ////////////////////////////////////////////////////////////////
-  ///                      CONFIG STORAGE                      ///
-  ////////////////////////////////////////////////////////////////
-  /// @dev The address of the World ID Router contract that will be used for verifying proofs
-  IWorldID internal immutable worldId;
-  // address public worldID;
+    ////////////////////////////////////////////////////////////////
+    ///                      CONFIG STORAGE                      ///
+    ////////////////////////////////////////////////////////////////
 
-  enum RewardType {
-    None,
-    TOKEN,
-    NFT
-  }
+    IWorldID internal immutable worldId;
 
-  struct Event {
-    uint256 id;
-    address creator;
-    string description;
-    string name;
-    uint256 timestamp;
-    RewardType rewardType;
-    uint256 totalParticipant;
-    address tokenAddress; //If rewardType is an ERC20 Token
-    uint256 amountReward; //Amount Reward for each participant Example: 10DAI for each Participant
-    uint256 firstregistrantBonus; //bonus for first registrant.
-    uint256 nftBonusId; //Bonus for First time registrant if reward is NFT
-    address eventNFT;
-  }
-
-  address public rewardContract;
-  string public appId;
-  string public actionId;
-
-  //  State Variable for Create Events
-  uint256 public nextEventId;
-
-  mapping(uint256 => mapping(address => bool)) public isParticipant; //EventId => USer Address =>
-  // Bool
-  mapping(uint256 => mapping(address => bool)) public hasClaimedReward; //EventId => USer Address =>
-  // Bool
-  mapping(uint256 => mapping(uint256 => bool)) public nullifierHashes; // eventId => nullifierHash
-  // => bool
-  mapping(uint256 => address[]) eventParticipant;
-
-  ////////////////////////////////////////////////////////////////
-  ///                       CONSTRUCTOR                        ///
-  ////////////////////////////////////////////////////////////////
-
-  /// @param _worldId The address of the WorldIDRouter that will verify the proofs
-  /// @param _appId The World ID App ID (from Developer Portal)
-  /// @param _actionId The World ID Action (from Developer Portal)
-  constructor(
-    IWorldID _worldId,
-    address _rewardContract,
-    string memory _appId,
-    string memory _actionId
-  ) {
-    worldId = _worldId;
-    rewardContract = _rewardContract;
-    appId = _appId;
-    actionId = _actionId;
-  }
-
-  Event[] public events;
-
-  event RegisteredSuccessful(uint256 indexed eventId, address _addr);
-
-  ////////////////////////////////////////////////////////////////
-  ///                        FUNCTIONS                         ///
-  ////////////////////////////////////////////////////////////////
-
-  /**
-   * @notice Creates a new event with the specified details.
-   * @dev Validates inputs such as name, description, timestamp, and reward configuration.
-   * @param name The name of the event.
-   * @param description A description of the event.
-   * @param timestamp The scheduled timestamp of the event (must be in the future).
-   * @param _rewardType The type of reward for participants (TOKEN or NFT).
-   * @param _tokenAddress The address of the token/NFT contract (required if reward type is TOKEN or
-   * NFT).
-   * @param _amountReward The amount of ERC20 token reward per participant (if applicable).
-   * @param _firstregistrantBonus The bonus reward for the first registrant.
-   * @param bonusNft The NFT ID for the bonus reward (if reward is NFT).
-   * @param _eventNFT The address of the event-specific NFT contract.
-   */
-  function createEvent(
-    string memory name,
-    string memory description,
-    uint256 timestamp,
-    RewardType _rewardType,
-    address _tokenAddress,
-    uint256 _amountReward,
-    uint256 _firstregistrantBonus,
-    uint256 bonusNft,
-    address _eventNFT
-  )
-    public
-  {
-    // Validation checks
-    require(bytes(name).length > 0, "Event name is required");
-    require(bytes(description).length > 0, "Description is required");
-    require(timestamp > block.timestamp, "Timestamp must be in the future");
-    if (_rewardType == RewardType.TOKEN) {
-      require(_tokenAddress != address(0), "Enter valid token Address");
-    }
-    if (_rewardType == RewardType.NFT) {
-      require(_tokenAddress != address(0), "Enter valid token Address");
+    enum RewardType {
+        NONE,
+        TOKEN,
+        NFT
     }
 
-    require(_eventNFT != address(0), "Invalid event NFT contract.");
+    enum TokenType {
+        NONE,
+        USDC,
+        WLD,
+        NFT
+    }
 
-    // Create the event
-    events.push(
-      Event({
-        id: nextEventId,
-        creator: msg.sender,
-        name: name,
-        description: description,
-        timestamp: timestamp,
-        rewardType: _rewardType,
-        totalParticipant: 0,
-        tokenAddress: _tokenAddress,
-        amountReward: _amountReward,
-        firstregistrantBonus: _firstregistrantBonus,
-        nftBonusId: bonusNft,
-        eventNFT: _eventNFT
-      })
+    struct Event {
+        uint256 id;
+        string description;
+        string name;
+        uint256 timestamp;
+        RewardType rewardType;
+        address creator;
+        address[] participants;
+    }
+
+    IEventRewardManager public rewardContract;
+    IEventNFT public eventNFt;
+    string public appId;
+    string public actionId;
+    address public owner;
+    uint256 internal groupId;
+    uint256 internal immutable externalNullifier;
+
+    event ParticipantRegistered(uint256 eventId, address indexed participant);
+    event MerkleRootGenerated(uint256 eventId, bytes32 merkleRoot);
+
+    mapping(uint256 => mapping(address => bool)) private registeredParticipants;
+    mapping(uint256 => Event) private events;
+    uint256[] private eventIds;
+    uint256 private nextEventId;
+    mapping(uint256 => bool) private nullifierHashes;
+    uint256 public worldIdRoot;
+
+    event ParticipantRewardSet(
+        uint256 indexed eventId,
+        address indexed participant,
+        address indexed tokenAddress,
+        uint256 amount
+    );
+    event BulkTokenRewardSet(
+        uint256 indexed eventId,
+        address[] indexed recipients,
+        uint256[] amounts
     );
 
-    // Increment the event ID
-    nextEventId++;
-  }
+    ////////////////////////////////////////////////////////////////
+    ///                       CONSTRUCTOR                        ///
+    ////////////////////////////////////////////////////////////////
 
-  /**
-   * @notice Fetches the details of an event by its ID.
-   * @param id The ID of the event to retrieve.
-   * @return Event The event data associated with the given ID.
-   */
-  function getEvent(uint256 id) public view returns (Event memory) {
-    if (id >= events.length) revert("Event does not exist");
-    return events[id];
-  }
-
-  /**
-   * @notice Fetches the list of all events created in the contract.
-   * @return Event[] An array containing all event details.
-   */
-  function getAllEvents() public view returns (Event[] memory) {
-    return events;
-  }
-
-  /**
-   * @notice Adds an event manually for testing purposes.
-   * @dev This function is intended for testing scenarios to prepopulate events.
-   * @param id The unique ID of the event.
-   * @param description A description of the event.
-   * @param creator The address of the event creator.
-   * @param name The name of the event.
-   * @param timestamp The timestamp of the event.
-   * @param rewardType The reward type (None, TOKEN, or NFT).
-   * @param _tokenAddress The token/NFT contract address.
-   * @param _amountReward The amount of ERC20 token reward (if applicable).
-   * @param _firstregistrantBonus The bonus for the first registrant.
-   * @param bonusNft The NFT ID for the bonus (if applicable).
-   * @param _eventNFT The address of the Event NFT contract.
-   */
-  function addEventForTesting(
-    uint256 id,
-    string memory description,
-    address creator,
-    string memory name,
-    uint256 timestamp,
-    RewardType rewardType,
-    address _tokenAddress,
-    uint256 _amountReward,
-    uint256 _firstregistrantBonus,
-    uint256 bonusNft,
-    address _eventNFT
-  )
-    public
-  {
-    events.push(
-      Event({
-        id: id,
-        description: description,
-        creator: creator,
-        name: name,
-        timestamp: timestamp,
-        rewardType: rewardType,
-        totalParticipant: 0,
-        tokenAddress: _tokenAddress,
-        amountReward: _amountReward,
-        firstregistrantBonus: _firstregistrantBonus,
-        nftBonusId: bonusNft,
-        eventNFT: _eventNFT
-      })
-    );
-  }
-
-  /**
-   * @notice Fetches the World ID contract address used for verification.
-   * @return IWorldID The address of the World ID router contract.
-   */
-  function getWorldId() public view returns (IWorldID) {
-    return worldId;
-  }
-
-  /**
-   * @notice Allows a user to register for an event using World ID verification.
-   * @dev Ensures the event has not started, the user has not already registered,
-   * and World ID verification is successful.
-   * @param eventId The ID of the event to register for.
-   * @param root The root of the World ID Merkle tree.
-   * @param nullifierHash The nullifier hash for the user.
-   * @param proof The ZKP (Zero-Knowledge Proof) for World ID verification.
-   */
-  function registerParticipant(
-    uint256 eventId,
-    uint256 root,
-    uint256 nullifierHash,
-    uint256[8] memory proof
-  )
-    public
-  {
-    Event storage eventData = events[eventId];
-    require(eventData.timestamp > block.timestamp, "Event has already started");
-    require(!isParticipant[eventId][msg.sender], "Already Registered");
-
-    // Verify the participant using World ID
-    worldId.verifyProof(root, nullifierHash, msg.sender, appId, actionId, proof);
-
-    ++eventData.totalParticipant;
-    isParticipant[eventId][msg.sender] = true;
-    eventParticipant[eventId].push(msg.sender);
-
-    emit RegisteredSuccessful(eventId, msg.sender);
-  }
-
-  /**
-   * @notice Allows the event creator to set the Merkle root for event NFTs.
-   * @dev Only the creator of the event can set the Merkle root.
-   * @param eventId The ID of the event for which to set the Merkle root.
-   * @param _merkleRoot The new Merkle root to be set in the Event NFT contract.
-   */
-  function setEventMerkleRoot(uint256 eventId, bytes32 _merkleRoot) external {
-    Event storage eventData = events[eventId];
-    require(msg.sender == eventData.creator, "Only event creator can set root");
-    IEventNFT nftContract = IEventNFT(eventData.eventNFT);
-    nftContract.setMerkleRoot(_merkleRoot);
-  }
-
-  /**
-   * @notice Allows a participant to claim their reward after registering for an event.
-   * @dev Supports both ERC20 token rewards and NFT rewards. Ensures the participant
-   * has not claimed the reward previously and that their nullifier hash is not reused.
-   * @param eventId The ID of the event for which the reward is being claimed.
-   * @param nullifierHash The nullifier hash to prevent double claiming.
-   * @param proof The Merkle proof required for NFT reward claims.
-   */
-  function claimReward(uint256 eventId, uint256 nullifierHash, bytes32[] calldata proof) external {
-    require(isParticipant[eventId][msg.sender], "Not a participant");
-    require(!hasClaimedReward[eventId][msg.sender], "Reward already claimed");
-    require(!nullifierHashes[eventId][nullifierHash], "Hash already used");
-
-    Event storage eventData = events[eventId];
-    address tokenAddress = eventData.tokenAddress;
-    if (eventData.rewardType == RewardType.TOKEN) {
-      uint256 totalReward = eventData.amountReward;
-      if (msg.sender == eventParticipant[eventData.id][0]) {
-        totalReward += eventData.firstregistrantBonus;
-      }
-
-      require(
-        IERC20(tokenAddress).balanceOf(address(this)) >= totalReward, "Insufficient reward balance"
-      );
-
-      IERC20(eventData.tokenAddress).transfer(msg.sender, totalReward);
+    constructor(
+        address _worldId,
+        uint256 _root,
+        string memory _appId,
+        string memory _actionId,
+        uint256 _groupId,
+        address _eventNFTAdd
+    ) {
+        eventNFt = IEventNFT(_eventNFTAdd);
+        worldId = IWorldID(_worldId);
+        appId = _appId;
+        actionId = _actionId;
+        worldIdRoot = _root;
+        owner = msg.sender;
+        groupId = _groupId;
+        externalNullifier = abi.encodePacked(_appId, _actionId).hashToField();
     }
 
-    if (eventData.rewardType == RewardType.NFT) {
-      IEventNFT nftContract = IEventNFT(eventData.eventNFT);
-      nftContract.claimNFT(msg.sender, proof);
+    modifier onlyOwner() {
+        require(owner == msg.sender, "Not Owner");
+        _;
+    }
 
-      // Handle bonus NFT for the first registrant
-      if (msg.sender == eventParticipant[eventData.id][0]) {
+    modifier onlyEventManager(uint256 _eventId) {
+        Event memory ev = events[_eventId];
+        require(msg.sender == ev.creator, "Not event manager");
+        _;
+    }
+
+    function checkZeroAddress() internal view {
+        if (msg.sender == address(0)) revert("Zero address detected!");
+    }
+
+    function checkEventIsValid(uint256 _eventId) internal view {
+        if (events[_eventId].creator == address(0x0)) {
+            revert("Event does not exist");
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////
+    ///                        FUNCTIONS                         ///
+    ////////////////////////////////////////////////////////////////
+
+    function setRewardContract(address _rewardContract) external onlyOwner {
         require(
-          IERC721(eventData.tokenAddress).ownerOf(eventData.nftBonusId) == address(this),
-          "Contract does not own the bonus NFT"
+            address(rewardContract) == address(0),
+            "Reward contract already set"
         );
-        IERC721(tokenAddress).safeTransferFrom(address(this), msg.sender, eventData.nftBonusId);
-      }
+        require(
+            _rewardContract != address(0),
+            "Invalid reward contract address"
+        );
+
+        rewardContract = IEventRewardManager(_rewardContract);
     }
 
-    hasClaimedReward[eventData.id][msg.sender] = true;
-    nullifierHashes[eventId][nullifierHash] = true;
-  }
+    /// @dev Register a participant for an existing event after World ID verification.
+    function registerParticipant(
+        uint256 eventId,
+        uint256 nullifierHash,
+        uint256[8] calldata proof
+    ) public {
+        require(eventId < nextEventId, "Event does not exist");
+        require(
+            !registeredParticipants[eventId][msg.sender],
+            "Already registered as participant"
+        );
+        require(
+            !nullifierHashes[nullifierHash],
+            "World ID verification already used"
+        );
+
+        // We now verify the provided proof is valid and the user is verified by World ID
+        worldId.verifyProof(
+            worldIdRoot,
+            groupId,
+            abi.encodePacked(msg.sender).hashToField(),
+            nullifierHash,
+            externalNullifier,
+            proof
+        );
+
+        events[eventId].participants.push(msg.sender);
+        registeredParticipants[eventId][msg.sender] = true;
+        nullifierHashes[nullifierHash] = true;
+
+        emit ParticipantRegistered(eventId, msg.sender);
+    }
+
+    /// @dev Create a new event
+    function createEvent(
+        string memory name,
+        string memory description,
+        uint256 timestamp,
+        address _tokenAddress,
+        RewardType _rewardType,
+        TokenType _rewardToken,
+        uint256 _rewardAmount
+    ) public {
+        require(bytes(name).length > 0, "Event name is required");
+        require(bytes(description).length > 0, "Description is required");
+        require(timestamp > block.timestamp, "Timestamp must be in the future");
+        require(_tokenAddress != address(0), "Invalid token address");
+        require(_rewardAmount > 0, "Invalid token amount");
+
+        if (_rewardType == RewardType.TOKEN) {
+            require(
+                _rewardToken == TokenType.USDC || _rewardToken == TokenType.WLD,
+                "Invalid token type"
+            );
+
+            events[nextEventId] = Event({
+                id: nextEventId,
+                name: name,
+                description: description,
+                timestamp: timestamp,
+                rewardType: _rewardType,
+                creator: msg.sender,
+                participants: new address[](0)
+            });
+
+            eventIds.push(nextEventId);
+
+            IEventRewardManager.TokenType rewardTokenType = IEventRewardManager
+                .TokenType(uint256(_rewardToken));
+
+            rewardContract.createTokenReward(
+                nextEventId,
+                rewardTokenType,
+                _tokenAddress,
+                _rewardAmount,
+                msg.sender
+            );
+        }
+
+        nextEventId++;
+    }
+
+    function updateEventTokenReward(
+        uint256 _eventId,
+        uint256 _amount
+    ) external onlyEventManager(_eventId) {
+        checkZeroAddress();
+
+        checkEventIsValid(_eventId);
+
+        require(msg.sender != address(0), "Address zero detected.");
+
+        Event memory ev = events[_eventId];
+
+        rewardContract.updateTokenReward(msg.sender, _eventId, _amount);
+
+        //Emit Event Here
+    }
+
+    /// @dev Retrieve an event by its ID
+    function getEvent(uint256 id) public view returns (Event memory) {
+        if (events[id].id != id) {
+            revert("Event does not exist");
+        }
+        return events[id];
+    }
+
+    /// @dev Retrieve all events
+    function getAllEvents() public view returns (Event[] memory) {
+        Event[] memory allEvents = new Event[](eventIds.length);
+        for (uint256 i = 0; i < eventIds.length; i++) {
+            allEvents[i] = events[eventIds[i]];
+        }
+        return allEvents;
+    }
+
+    /// @dev Distribute token reward to a participant
+    function setTokenRewardForParticipant(
+        uint256 eventId,
+        address _participant,
+        uint256 _reward
+    ) external onlyEventManager(eventId) {
+        require(
+            registeredParticipants[eventId][_participant],
+            "Invalid participant."
+        );
+        require(_reward > 0, "Invalid reward amount");
+
+        Event memory ev = events[eventId];
+
+        rewardContract.distributeTokenReward(eventId, _participant, _reward);
+
+        emit ParticipantRewardSet(eventId, _participant, ev.creator, _reward);
+    }
+
+    /// @dev Distribute bulk rewards
+    function setBulkRewardsForParticipants(
+        uint256 eventId,
+        address[] calldata _participants,
+        uint256[] calldata _rewards
+    ) external onlyEventManager(eventId) {
+        require(
+            _participants.length == _rewards.length,
+            "Array lengths must match"
+        );
+
+        rewardContract.distributeMultipleTokenRewards(
+            eventId,
+            _participants,
+            _rewards
+        );
+
+        emit BulkTokenRewardSet(eventId, _participants, _rewards);
+    }
+
+    /// @dev Claim token reward
+    function claimReward(
+        uint256 eventId,
+        uint256 nullifierHash,
+        uint256[8] calldata proof
+    ) external {
+        require(msg.sender != address(0), "Invalid address");
+        require(
+            registeredParticipants[eventId][msg.sender],
+            "Not registered for event"
+        );
+
+        checkEventIsValid(eventId);
+
+        worldId.verifyProof(
+            worldIdRoot,
+            groupId,
+            abi.encodePacked(msg.sender).hashToField(),
+            nullifierHash,
+            externalNullifier,
+            proof
+        );
+
+        rewardContract.claimTokenReward(eventId, msg.sender);
+    }
+
+    function claimNFTReward(
+        uint256 eventId,
+        uint256 nullifierHash,
+        uint256[8] calldata proof
+    ) external {
+        require(msg.sender != address(0), "Invalid address");
+        require(
+            registeredParticipants[eventId][msg.sender],
+            "Not registered for event"
+        );
+
+        checkEventIsValid(eventId);
+
+        worldId.verifyProof(
+            worldIdRoot,
+            groupId,
+            abi.encodePacked(msg.sender).hashToField(),
+            nullifierHash,
+            externalNullifier,
+            proof
+        );
+
+        eventNFt.claimNFTWithZk(msg.sender);
+    }
 }
