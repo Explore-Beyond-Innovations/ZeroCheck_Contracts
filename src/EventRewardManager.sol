@@ -60,6 +60,12 @@ contract EventRewardManager is Ownable {
     eventManager = EventManager(_eventManagerAddress);
   }
 
+  modifier onlyEventManager(uint256 _eventId, address _caller) {
+    EventManager.Event memory ev = eventManager.getEvent(_eventId);
+    require(_caller == ev.creator, "Not event manager");
+    _;
+  }
+
   function checkZeroAddress() internal view {
     if (msg.sender == address(0)) revert("Zero address detected!");
   }
@@ -130,12 +136,13 @@ contract EventRewardManager is Ownable {
 
   // Function to distribute tokens to event participants
   function distributeTokenReward(
+    address _eventCreator,
     uint256 _eventId,
     address _recipient,
     uint256 _participantReward
   )
     external
-    onlyOwner
+    onlyEventManager(_eventId, _eventCreator)
   {
     checkEventIsValid(_eventId);
 
@@ -156,15 +163,17 @@ contract EventRewardManager is Ownable {
   }
 
   function distributeMultipleTokenRewards(
+    address _caller,
     uint256 _eventId,
     address[] calldata _recipients,
     uint256[] calldata _participantRewards
   )
     external
-    onlyOwner
+    onlyEventManager(_eventId, _caller)
   {
     checkEventIsValid(_eventId);
     require(_recipients.length == _participantRewards.length, "Arrays length mismatch");
+    require(_caller != address(0), "Caller can't be address zero");
     require(_recipients.length > 0, "Empty arrays");
     require(_participantRewards.length > 0, "Empty arrays");
 

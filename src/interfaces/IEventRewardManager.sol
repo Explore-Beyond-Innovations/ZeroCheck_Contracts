@@ -52,9 +52,10 @@ interface IEventRewardManager {
   )
     external;
 
-  function updateTokenReward(uint256 _eventId, uint256 _amount) external;
+  function updateTokenReward(address eventmanager, uint256 _eventId, uint256 _amount) external;
 
   function distributeTokenReward(
+    address eventManager,
     uint256 _eventId,
     address _recipient,
     uint256 _participantReward
@@ -62,6 +63,7 @@ interface IEventRewardManager {
     external;
 
   function distributeMultipleTokenRewards(
+    address _caller,
     uint256 _eventId,
     address[] calldata _recipients,
     uint256[] calldata _participantRewards

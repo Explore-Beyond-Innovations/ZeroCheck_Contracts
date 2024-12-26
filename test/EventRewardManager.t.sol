@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "../src/EventManager.sol";
+import "../src/EventNFT.sol";
 import "../src/EventRewardManager.sol";
 
 contract MockWorldID is IWorldID {
@@ -15,12 +16,14 @@ contract MockWorldID is IWorldID {
 
   function verifyProof(
     uint256 root,
+    uint256 groupId,
+    uint256 signal,
     uint256 nullifierHash,
+    uint256 externalNullifier,
     uint256[8] calldata proof
   )
     external
     view
-    override
   {
     require(root == validRoot, "Invalid root");
     require(nullifierHash != 0, "Invalid nullifierHash");
@@ -34,6 +37,7 @@ contract EventRewardManagerTest is Test {
   MockWorldID public mockWorldID;
   MockERC20 public usdcToken;
   MockERC20 public wldToken;
+  EventNFT public eventNFT;
 
   address public owner;
   address public participant;
@@ -61,12 +65,15 @@ contract EventRewardManagerTest is Test {
     usdcToken = new MockERC20("USDC", "USDC", 6);
     wldToken = new MockERC20("WLD", "WLD", 18);
 
-    eventManager = new EventManager(address(mockWorldID), 123_456_789, "appId", "actionId");
+    eventManager = new EventManager(address(mockWorldID), 123_456_789, "appId", "actionId", 1);
 
     rewardManager = new EventRewardManager(address(eventManager));
 
     // Set the Reward Contract
     eventManager.setRewardContract(address(rewardManager));
+
+    eventNFT =
+      new EventNFT("EventNFT", "ENFT", 100, "https://base.uri/", address(eventManager), owner);
 
     // Mint and Approve Tokens
     uint256 _RewardAmount = 100 * 10 ** 6; // 100 USDC
@@ -304,7 +311,7 @@ contract EventRewardManagerTest is Test {
     rewardManager.createTokenReward(
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount, eventCreator
     );
-    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+    rewardManager.distributeTokenReward(eventCreator, eventId, participant, rewardAmount);
 
     uint256 distributedReward = rewardManager.getUserTokenReward(eventId, participant);
     assertEq(distributedReward, rewardAmount);
@@ -318,7 +325,7 @@ contract EventRewardManagerTest is Test {
     vm.expectEmit(true, true, false, true);
     emit EventRewardManager.TokenRewardDistributed(eventId, participant, rewardAmount);
 
-    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+    rewardManager.distributeTokenReward(eventCreator, eventId, participant, rewardAmount);
   }
 
   function testDistributeTokenRewardEventDoesNotExist() public {
@@ -331,7 +338,9 @@ contract EventRewardManagerTest is Test {
 
     // Attempt to distribute tokens for an event that does not exist
     vm.expectRevert("Event does not exist");
-    rewardManager.distributeTokenReward(invalidEventId, participant, participantReward);
+    rewardManager.distributeTokenReward(
+      eventCreator, invalidEventId, participant, participantReward
+    );
   }
 
   function testDistributeTokenRewardInsufficientRewardAmount() public {
@@ -343,7 +352,7 @@ contract EventRewardManagerTest is Test {
 
     // Attempt to distribute more tokens than available in contract
     vm.expectRevert("Insufficient reward amount");
-    rewardManager.distributeTokenReward(eventId, participant, participantReward);
+    rewardManager.distributeTokenReward(eventCreator, eventId, participant, participantReward);
   }
 
   function testGetUserTokenReward() public {
@@ -351,7 +360,7 @@ contract EventRewardManagerTest is Test {
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount, eventCreator
     );
 
-    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+    rewardManager.distributeTokenReward(eventCreator, eventId, participant, rewardAmount);
 
     assertEq(rewardManager.getUserTokenReward(eventId, participant), rewardAmount);
   }
@@ -386,7 +395,7 @@ contract EventRewardManagerTest is Test {
     rewardManager.createTokenReward(
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount, eventCreator
     );
-    rewardManager.distributeTokenReward(eventId, user1, rewardAmount);
+    rewardManager.distributeTokenReward(eventCreator, eventId, user1, rewardAmount);
 
     vm.prank(user1);
     rewardManager.claimTokenReward(eventId, user1);
@@ -402,7 +411,7 @@ contract EventRewardManagerTest is Test {
     rewardManager.createTokenReward(
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount, eventCreator
     );
-    rewardManager.distributeTokenReward(eventId, user1, rewardAmount);
+    rewardManager.distributeTokenReward(eventCreator, eventId, user1, rewardAmount);
 
     vm.expectEmit(true, true, false, true);
     emit EventRewardManager.TokenRewardClaimed(eventId, user1, rewardAmount);
@@ -415,7 +424,7 @@ contract EventRewardManagerTest is Test {
     rewardManager.createTokenReward(
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount, eventCreator
     );
-    rewardManager.distributeTokenReward(eventId, unverifiedUser, rewardAmount);
+    rewardManager.distributeTokenReward(eventCreator, eventId, unverifiedUser, rewardAmount);
 
     vm.prank(unverifiedUser);
     vm.expectRevert("Not a registered participant");
@@ -426,7 +435,7 @@ contract EventRewardManagerTest is Test {
     rewardManager.createTokenReward(
       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount, eventCreator
     );
-    rewardManager.distributeTokenReward(eventId, participant, rewardAmount);
+    rewardManager.distributeTokenReward(eventCreator, eventId, participant, rewardAmount);
 
     vm.startPrank(participant);
     rewardManager.claimTokenReward(eventId, participant);
@@ -456,7 +465,9 @@ contract EventRewardManagerTest is Test {
     rewards[1] = 5;
     rewards[2] = 5;
 
-    rewardManager.distributeMultipleTokenRewards(eventId, recipients, rewards);
+    rewardManager.distributeMultipleTokenRewards(
+      address(eventCreator), eventId, recipients, rewards
+    );
 
     assertEq(rewardManager.getUserTokenReward(eventId, user1), 5, "User1 reward incorrect");
     assertEq(rewardManager.getUserTokenReward(eventId, user2), 5, "User2 reward incorrect");
@@ -481,7 +492,9 @@ contract EventRewardManagerTest is Test {
     rewards[1] = 6;
     rewards[2] = 8;
 
-    rewardManager.distributeMultipleTokenRewards(eventId, recipients, rewards);
+    rewardManager.distributeMultipleTokenRewards(
+      address(eventCreator), eventId, recipients, rewards
+    );
 
     uint256[] memory distributedRewards =
       rewardManager.getMultipleDistributedTokenRewards(eventId, recipients);
@@ -508,7 +521,9 @@ contract EventRewardManagerTest is Test {
     rewards[2] = 1_000_000_000;
 
     vm.expectRevert("Insufficient reward amount");
-    rewardManager.distributeMultipleTokenRewards(eventId, recipients, rewards);
+    rewardManager.distributeMultipleTokenRewards(
+      address(eventCreator), eventId, recipients, rewards
+    );
   }
 
   function testDistributeMultipleTokenRewardsArrayMismatch() public {
@@ -526,7 +541,9 @@ contract EventRewardManagerTest is Test {
     rewards[1] = 5;
 
     vm.expectRevert("Arrays length mismatch");
-    rewardManager.distributeMultipleTokenRewards(eventId, recipients, rewards);
+    rewardManager.distributeMultipleTokenRewards(
+      address(eventCreator), eventId, recipients, rewards
+    );
   }
 
   function testDistributedMultipleTokenRewardsEmptyArray() public {
@@ -538,7 +555,9 @@ contract EventRewardManagerTest is Test {
     uint256[] memory emptyRewards = new uint256[](0);
 
     vm.expectRevert("Empty arrays");
-    rewardManager.distributeMultipleTokenRewards(eventId, emptyRecipients, emptyRewards);
+    rewardManager.distributeMultipleTokenRewards(
+      address(eventCreator), eventId, emptyRecipients, emptyRewards
+    );
   }
 
   function testGetMultipleDistributedTokenRewardsEmptyArray() public view {

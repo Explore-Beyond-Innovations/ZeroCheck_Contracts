@@ -4,6 +4,9 @@ pragma solidity ^0.8.13;
 import {IWorldID} from "./interfaces/IWorldID.sol";
 import "./interfaces/IEventNFT.sol";
 import "./interfaces/IEventRewardManager.sol";
+import {ByteHasher} from "./helpers/ByteHasher.sol";
+
+using ByteHasher for bytes;
 
 contract EventManager {
     ////////////////////////////////////////////////////////////////
@@ -74,10 +77,8 @@ contract EventManager {
         uint256 _root,
         string memory _appId,
         string memory _actionId,
-        uint256 _groupId,
-        address _eventNFTAdd
+        uint256 _groupId
     ) {
-        eventNFt = IEventNFT(_eventNFTAdd);
         worldId = IWorldID(_worldId);
         appId = _appId;
         actionId = _actionId;
@@ -100,6 +101,11 @@ contract EventManager {
 
     function checkZeroAddress() internal view {
         if (msg.sender == address(0)) revert("Zero address detected!");
+    }
+
+    function setEventNFTAddress(address _addr) external onlyOwner {
+        require(_addr != address(0), "Address zero detected");
+        eventNFt = IEventNFT(_addr);
     }
 
     function checkEventIsValid(uint256 _eventId) internal view {
@@ -190,8 +196,6 @@ contract EventManager {
                 participants: new address[](0)
             });
 
-            eventIds.push(nextEventId);
-
             IEventRewardManager.TokenType rewardTokenType = IEventRewardManager
                 .TokenType(uint256(_rewardToken));
 
@@ -203,6 +207,20 @@ contract EventManager {
                 msg.sender
             );
         }
+
+        if (_rewardType == RewardType.NFT) {
+            events[nextEventId] = Event({
+                id: nextEventId,
+                name: name,
+                description: description,
+                timestamp: timestamp,
+                rewardType: _rewardType,
+                creator: msg.sender,
+                participants: new address[](0)
+            });
+        }
+
+        eventIds.push(nextEventId);
 
         nextEventId++;
     }
@@ -216,8 +234,6 @@ contract EventManager {
         checkEventIsValid(_eventId);
 
         require(msg.sender != address(0), "Address zero detected.");
-
-        Event memory ev = events[_eventId];
 
         rewardContract.updateTokenReward(msg.sender, _eventId, _amount);
 
@@ -255,7 +271,12 @@ contract EventManager {
 
         Event memory ev = events[eventId];
 
-        rewardContract.distributeTokenReward(eventId, _participant, _reward);
+        rewardContract.distributeTokenReward(
+            msg.sender,
+            eventId,
+            _participant,
+            _reward
+        );
 
         emit ParticipantRewardSet(eventId, _participant, ev.creator, _reward);
     }
@@ -272,6 +293,7 @@ contract EventManager {
         );
 
         rewardContract.distributeMultipleTokenRewards(
+            msg.sender,
             eventId,
             _participants,
             _rewards
@@ -310,12 +332,18 @@ contract EventManager {
         uint256 eventId,
         uint256 nullifierHash,
         uint256[8] calldata proof
-    ) external {
+    ) external returns (bool, address, uint256) {
         require(msg.sender != address(0), "Invalid address");
         require(
             registeredParticipants[eventId][msg.sender],
             "Not registered for event"
         );
+
+        Event memory ev = events[eventId];
+
+        require(ev.creator != address(0), "Address zero detected");
+
+        require(ev.rewardType == RewardType.NFT, "Event is not NFT supported");
 
         checkEventIsValid(eventId);
 
@@ -328,6 +356,8 @@ contract EventManager {
             proof
         );
 
-        eventNFt.claimNFTWithZk(msg.sender);
+        (bool isClaimed, address participant, uint256 tokenId) = eventNFt
+            .claimNFTWithZk(msg.sender);
+        return (isClaimed, participant, tokenId);
     }
 }

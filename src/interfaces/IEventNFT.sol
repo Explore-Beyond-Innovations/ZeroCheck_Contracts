@@ -21,5 +21,5 @@ interface IEventNFT {
 
   function claimed(address participant) external view returns (bool);
 
-  function claimNFTWithZk(address participant) external;
+  function claimNFTWithZk(address participant) external returns (bool, address, uint256);
 }

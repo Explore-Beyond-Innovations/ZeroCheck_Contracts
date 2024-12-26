@@ -15,6 +15,9 @@ contract EventNFT is ERC721, Ownable {
   bytes32 public merkleRoot; // Merkle root of the participant list
   mapping(address => bool) public claimed; // Track if an address has already claimed an NFT
 
+  event AttemptingClaim(address participant, uint256 nextTokenId);
+  event ClaimSuccessful(address participant, uint256 tokenId);
+
   constructor(
     string memory name,
     string memory symbol,
@@ -70,13 +73,22 @@ contract EventNFT is ERC721, Ownable {
     _safeMint(participant, tokenId);
   }
 
-  function claimNFTWithZk(address participant) external onlyEventContract {
+  function claimNFTWithZk(address participant) external returns (bool, address, uint256) {
     require(_nextTokenId < maxSupply, "Max supply reached");
+    emit AttemptingClaim(participant, _nextTokenId);
 
     claimed[participant] = true;
 
     uint256 tokenId = _nextTokenId++;
     _safeMint(participant, tokenId);
+
+    emit ClaimSuccessful(participant, tokenId);
+
+    return (true, participant, tokenId);
+  }
+
+  function hasClaimedNFT(address user) external view returns (bool) {
+    return claimed[user];
   }
 
   function setBaseURI(string memory baseURI) external onlyOwner {

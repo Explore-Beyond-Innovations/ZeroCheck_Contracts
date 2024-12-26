@@ -45,7 +45,7 @@ contract WithdrawUnclaimedReward is EventRewardManagerTest {
     );
 
     uint256 claimAmount = rewardAmount / 2;
-    rewardManager.distributeTokenReward(eventId, participant, claimAmount);
+    rewardManager.distributeTokenReward(eventCreator, eventId, participant, claimAmount);
 
     // Fast forward time
     vm.warp(block.timestamp + 31 days);
