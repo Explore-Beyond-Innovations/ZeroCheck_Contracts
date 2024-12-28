@@ -29,4 +29,13 @@ interface IEventNFT {
         uint256[8] calldata proof,
         address participant
     ) external returns (bool, address, uint256);
+
+    function mintBonusNFT(
+        uint256 worldIdRoot,
+        uint256 groupId,
+        uint256 nullifierHash,
+        uint256 externalNullifier,
+        uint256[8] calldata proof,
+        address participant
+    ) external returns (bool, address, uint256);
 }

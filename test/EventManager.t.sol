@@ -178,6 +178,7 @@ contract EventManagerTest is Test {
             "ENFT",
             100,
             "https://base.uri/",
+            "https://bonusbase.uri/",
             address(eventManager),
             owner,
             address(mockWorldId)
@@ -402,6 +403,29 @@ contract EventManagerTest is Test {
         assertEq(caller, user1);
         assertEq(mockEventNFT.ownerOf(tokenId), user1);
         assertTrue(mockEventNFT.hasClaimedNFT(user1));
+    }
+
+    function testClaimNFTBonusReward() public {
+        testCreateNFTEvent();
+
+        vm.prank(owner);
+        eventManager.setEventNFTAddress(address(mockEventNFT));
+
+        uint256[8] memory proof;
+        vm.prank(user1);
+        eventManager.registerParticipant(0, 12_345, proof);
+        vm.prank(user2);
+        eventManager.registerParticipant(0, 12_346, proof);
+
+        vm.prank(user1);
+        (bool isClaimed, address caller, uint256 tokenId) = eventManager
+            .claimNFTReward(0, 54_321, proof);
+
+        assertTrue(isClaimed);
+        assertEq(caller, user1);
+        assertEq(mockEventNFT.ownerOf(tokenId), user1);
+        assertTrue(mockEventNFT.hasClaimedNFT(user1));
+        assertTrue(mockEventNFT.hasClaimedBonusNFT(user1));
     }
 
     function testFailClaimNFTRewardForTokenEvent() public {

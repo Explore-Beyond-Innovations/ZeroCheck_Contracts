@@ -36,6 +36,7 @@ contract EventManager {
         RewardType rewardType;
         address creator;
         address[] participants;
+        bool isEnded;
     }
 
     IEventRewardManager public rewardContract;
@@ -74,6 +75,8 @@ contract EventManager {
         uint256 bonus
     );
 
+    event EventClosed(uint256 indexed eventId, bool closed);
+
     ////////////////////////////////////////////////////////////////
     ///                       CONSTRUCTOR                        ///
     ////////////////////////////////////////////////////////////////
@@ -105,6 +108,12 @@ contract EventManager {
         _;
     }
 
+    modifier isNotEnded(uint256 _eventId) {
+        Event memory ev = events[_eventId];
+        require(!ev.isEnded, "Event Has Ended.");
+        _;
+    }
+
     function checkZeroAddress() internal view {
         if (msg.sender == address(0)) revert("Zero address detected!");
     }
@@ -118,6 +127,61 @@ contract EventManager {
         if (events[_eventId].creator == address(0x0)) {
             revert("Event does not exist");
         }
+    }
+
+    // Helper Function 1: Proof Verification
+    function _verifyProof(
+        uint256 nullifierHash,
+        uint256[8] calldata proof
+    ) internal view {
+        worldId.verifyProof(
+            worldIdRoot,
+            groupId,
+            abi.encodePacked(msg.sender).hashToField(),
+            nullifierHash,
+            externalNullifier,
+            proof
+        );
+    }
+
+    // Helper Function 2: Process NFT Claim
+    function _processNFTClaim(
+        uint256 eventId,
+        Event memory ev,
+        uint256 nullifierHash,
+        uint256[8] calldata proof
+    ) internal returns (bool, address, uint256) {
+        (bool isClaimed, address participant, uint256 tokenId) = eventNFt
+            .claimNFTWithZk(
+                worldIdRoot,
+                groupId,
+                nullifierHash,
+                externalNullifier,
+                proof,
+                msg.sender
+            );
+
+        // Check if the sender is the first participant and mint bonus NFT
+        if (ev.participants.length > 0 && ev.participants[0] == msg.sender) {
+            (
+                bool bonusClaimed,
+                address bonusParticipant,
+                uint256 bonusTokenId
+            ) = eventNFt.mintBonusNFT(
+                    worldIdRoot,
+                    groupId,
+                    nullifierHash,
+                    externalNullifier,
+                    proof,
+                    msg.sender
+                );
+            // If the bonus NFT was successfully claimed, update return values
+            if (bonusClaimed) {
+                return (bonusClaimed, bonusParticipant, bonusTokenId);
+            }
+        }
+
+        return (isClaimed, participant, tokenId);
     }
 
     ////////////////////////////////////////////////////////////////
@@ -135,39 +199,6 @@ contract EventManager {
         );
 
         rewardContract = IEventRewardManager(_rewardContract);
-    }
-
-    /// @dev Register a participant for an existing event after World ID verification.
-    function registerParticipant(
-        uint256 eventId,
-        uint256 nullifierHash,
-        uint256[8] calldata proof
-    ) public {
-        require(eventId < nextEventId, "Event does not exist");
-        require(
-            !registeredParticipants[eventId][msg.sender],
-            "Already registered as participant"
-        );
-        require(
-            !nullifierHashes[nullifierHash],
-            "World ID verification already used"
-        );
-
-        // We now verify the provided proof is valid and the user is verified by World ID
-        worldId.verifyProof(
-            worldIdRoot,
-            groupId,
-            abi.encodePacked(msg.sender).hashToField(),
-            nullifierHash,
-            externalNullifier,
-            proof
-        );
-
-        events[eventId].participants.push(msg.sender);
-        registeredParticipants[eventId][msg.sender] = true;
-        nullifierHashes[nullifierHash] = true;
-
-        emit ParticipantRegistered(eventId, msg.sender);
     }
 
     /// @dev Create a new event
@@ -199,7 +230,8 @@ contract EventManager {
                 timestamp: timestamp,
                 rewardType: _rewardType,
                 creator: msg.sender,
-                participants: new address[](0)
+                participants: new address[](0),
+                isEnded: false
             });
 
             IEventRewardManager.TokenType rewardTokenType = IEventRewardManager
@@ -222,7 +254,8 @@ contract EventManager {
                 timestamp: timestamp,
                 rewardType: _rewardType,
                 creator: msg.sender,
-                participants: new address[](0)
+                participants: new address[](0),
+                isEnded: false
             });
         }
 
@@ -231,10 +264,55 @@ contract EventManager {
         nextEventId++;
     }
 
+    /// @dev Close an Event
+    function closeEvent(uint256 _eventId) external onlyEventManager(_eventId) {
+        checkEventIsValid(_eventId);
+
+        require(msg.sender != address(0), "Address zero detected.");
+
+        Event storage ev = events[_eventId];
+        ev.isEnded = true;
+
+        emit EventClosed(_eventId, true);
+    }
+
+    /// @dev Register a participant for an existing event after World ID verification.
+    function registerParticipant(
+        uint256 eventId,
+        uint256 nullifierHash,
+        uint256[8] calldata proof
+    ) public isNotEnded(eventId) {
+        require(eventId < nextEventId, "Event does not exist");
+        require(
+            !registeredParticipants[eventId][msg.sender],
+            "Already registered as participant"
+        );
+        require(
+            !nullifierHashes[nullifierHash],
+            "World ID verification already used"
+        );
+
+        // We now verify the provided proof is valid and the user is verified by World ID
+        worldId.verifyProof(
+            worldIdRoot,
+            groupId,
+            abi.encodePacked(msg.sender).hashToField(),
+            nullifierHash,
+            externalNullifier,
+            proof
+        );
+
+        events[eventId].participants.push(msg.sender);
+        registeredParticipants[eventId][msg.sender] = true;
+        nullifierHashes[nullifierHash] = true;
+
+        emit ParticipantRegistered(eventId, msg.sender);
+    }
+
     function updateEventTokenReward(
         uint256 _eventId,
         uint256 _amount
-    ) external onlyEventManager(_eventId) {
+    ) external onlyEventManager(_eventId) isNotEnded(_eventId) {
         checkZeroAddress();
 
         checkEventIsValid(_eventId);
@@ -268,7 +346,7 @@ contract EventManager {
         uint256 eventId,
         address _participant,
         uint256 _reward
-    ) external onlyEventManager(eventId) {
+    ) external onlyEventManager(eventId) isNotEnded(eventId) {
         require(
             registeredParticipants[eventId][_participant],
             "Invalid participant."
@@ -292,7 +370,7 @@ contract EventManager {
         uint256 eventId,
         address[] calldata _participants,
         uint256[] calldata _rewards
-    ) external onlyEventManager(eventId) {
+    ) external onlyEventManager(eventId) isNotEnded(eventId) {
         require(
             _participants.length == _rewards.length,
             "Array lengths must match"
@@ -308,12 +386,34 @@ contract EventManager {
         emit BulkTokenRewardSet(eventId, _participants, _rewards);
     }
 
+    /// @dev Set the Bonus token for the first participant of the event
+    /// This will be sumed up for the total amount that will be claimed by the participant
+    function giveFirstParticipantTokenBonus(
+        uint256 eventId,
+        uint256 bonus
+    ) external onlyEventManager(eventId) isNotEnded(eventId) {
+        Event memory ev = events[eventId];
+        require(ev.creator != address(0), "Invalid event Id");
+        require(bonus > 0, "Zero bonus not allowed");
+
+        address _recipient = ev.participants[0];
+
+        rewardContract.setFirstParticipantTokenBonus(
+            eventId,
+            _recipient,
+            msg.sender,
+            bonus
+        );
+
+        emit FirstParticpantBonusSet(eventId, _recipient, bonus);
+    }
+
     /// @dev Claim token reward
     function claimReward(
         uint256 eventId,
         uint256 nullifierHash,
         uint256[8] calldata proof
-    ) external {
+    ) external isNotEnded(eventId) {
         require(msg.sender != address(0), "Invalid address");
         require(
             registeredParticipants[eventId][msg.sender],
@@ -338,7 +438,7 @@ contract EventManager {
         uint256 eventId,
         uint256 nullifierHash,
         uint256[8] calldata proof
-    ) external returns (bool, address, uint256) {
+    ) external isNotEnded(eventId) returns (bool, address, uint256) {
         require(msg.sender != address(0), "Invalid address");
         require(
             registeredParticipants[eventId][msg.sender],
@@ -346,51 +446,13 @@ contract EventManager {
         );
 
         Event memory ev = events[eventId];
-
         require(ev.creator != address(0), "Address zero detected");
-
         require(ev.rewardType == RewardType.NFT, "Event is not NFT supported");
 
         checkEventIsValid(eventId);
 
-        worldId.verifyProof(
-            worldIdRoot,
-            groupId,
-            abi.encodePacked(msg.sender).hashToField(),
-            nullifierHash,
-            externalNullifier,
-            proof
-        );
+        _verifyProof(nullifierHash, proof);
 
-        (bool isClaimed, address participant, uint256 tokenId) = eventNFt
-            .claimNFTWithZk(
-                worldIdRoot,
-                groupId,
-                nullifierHash,
-                externalNullifier,
-                proof,
-                msg.sender
-            );
-        return (isClaimed, participant, tokenId);
-    }
-
-    function giveFirstParticipantTokenBonus(
-        uint256 eventId,
-        uint256 bonus
-    ) external onlyEventManager(eventId) {
-        Event memory ev = events[eventId];
-        require(ev.creator != address(0), "Invalid event Id");
-        require(bonus > 0, "Zero bonus not allowed");
-
-        address _recipient = ev.participants[0];
-
-        rewardContract.setFirstParticipantTokenBonus(
-            eventId,
-            _recipient,
-            msg.sender,
-            bonus
-        );
-
-        emit FirstParticpantBonusSet(eventId, _recipient, bonus);
+        return _processNFTClaim(eventId, ev, nullifierHash, proof);
     }
 }

@@ -20,6 +20,7 @@ contract EventNFTFactory {
     /// @param _symbol The symbol of the EventNFT
     /// @param _maxSupply The maximum supply of the EventNFT
     /// @param _baseURI The base URI for token metadata
+    /// @param _BonusbaseURI The Bonus Base URI for token metadata for Bonus
     /// @param _eventContract The address of the associated event contract
     /// @return newEventNFT_ The address of the newly created EventNFT contract
     /// @return length_ The current number of EventNFT contracts created
@@ -28,6 +29,7 @@ contract EventNFTFactory {
         string memory _symbol,
         uint256 _maxSupply,
         string memory _baseURI,
+        string memory _BonusbaseURI,
         address _eventContract,
         address _worldIDAddr
     ) external returns (EventNFT newEventNFT_, uint256 length_) {
@@ -37,6 +39,7 @@ contract EventNFTFactory {
             _symbol,
             _maxSupply,
             _baseURI,
+            _BonusbaseURI,
             _eventContract,
             msg.sender,
             _worldIDAddr

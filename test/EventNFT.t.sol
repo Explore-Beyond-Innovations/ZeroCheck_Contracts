@@ -86,6 +86,7 @@ contract EventNFTTest is Test, Merkle {
             "ENFT",
             100,
             "https://base.uri/",
+            "https://bonusbase.uri/",
             eventContract,
             owner,
             address(worldId)
@@ -202,6 +203,7 @@ contract EventNFTTest is Test, Merkle {
             "LNFT",
             1,
             "https://base.uri/",
+            "https://bonusbase.uri/",
             eventContract,
             owner,
             address(worldId)

@@ -32,6 +32,7 @@ contract EventNFTFactoryTest is Test {
             symbol,
             maxSupply,
             baseURI,
+            "https://bonusbase.uri/",
             eventContract,
             address(0x90)
         );
@@ -68,6 +69,7 @@ contract EventNFTFactoryTest is Test {
             "EV1",
             100,
             "uri1",
+            "https://bonusbase.uri/",
             address(0x3),
             address(0x90)
         );
@@ -76,6 +78,7 @@ contract EventNFTFactoryTest is Test {
             "EV2",
             200,
             "uri2",
+            "https://bonusbase.uri2/",
             address(0x4),
             address(0x90)
         );
@@ -113,6 +116,7 @@ contract EventNFTFactoryTest is Test {
                 symbol,
                 100 * (i + 1),
                 "uri",
+                "https://bonusbase.uri/",
                 address(uint160(i + 1)),
                 address(0x90)
             );
@@ -149,6 +153,7 @@ contract EventNFTFactoryTest is Test {
             "TEST",
             100,
             "uri",
+            "https://bonusbase.uri/",
             address(0x5),
             address(0x90)
         );

@@ -82,6 +82,7 @@ contract EventRewardManagerTest is Test {
             "ENFT",
             100,
             "https://base.uri/",
+            "https://bonusbase.uri/",
             address(eventManager),
             owner,
             address(0x90)
