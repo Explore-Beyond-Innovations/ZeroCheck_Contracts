@@ -68,6 +68,12 @@ contract EventManager {
         uint256[] amounts
     );
 
+    event FirstParticpantBonusSet(
+        uint256 indexed eventId,
+        address indexed participant,
+        uint256 bonus
+    );
+
     ////////////////////////////////////////////////////////////////
     ///                       CONSTRUCTOR                        ///
     ////////////////////////////////////////////////////////////////
@@ -357,7 +363,34 @@ contract EventManager {
         );
 
         (bool isClaimed, address participant, uint256 tokenId) = eventNFt
-            .claimNFTWithZk(msg.sender);
+            .claimNFTWithZk(
+                worldIdRoot,
+                groupId,
+                nullifierHash,
+                externalNullifier,
+                proof,
+                msg.sender
+            );
         return (isClaimed, participant, tokenId);
+    }
+
+    function giveFirstParticipantTokenBonus(
+        uint256 eventId,
+        uint256 bonus
+    ) external onlyEventManager(eventId) {
+        Event memory ev = events[eventId];
+        require(ev.creator != address(0), "Invalid event Id");
+        require(bonus > 0, "Zero bonus not allowed");
+
+        address _recipient = ev.participants[0];
+
+        rewardContract.setFirstParticipantTokenBonus(
+            eventId,
+            _recipient,
+            msg.sender,
+            bonus
+        );
+
+        emit FirstParticpantBonusSet(eventId, _recipient, bonus);
     }
 }

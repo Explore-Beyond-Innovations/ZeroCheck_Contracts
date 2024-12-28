@@ -2,113 +2,248 @@
 pragma solidity ^0.8.22;
 
 import "forge-std/Test.sol";
-import { EventNFT } from "../src/EventNFT.sol";
-import { Merkle } from "murky/src/Merkle.sol";
+import {EventNFT} from "../src/EventNFT.sol";
+import {Merkle} from "murky/src/Merkle.sol";
+import "../src/interfaces/IWorldID.sol";
+
+contract MockWorldID is IWorldID {
+    bool private isValid;
+    mapping(uint256 => bool) public nullifierHashes;
+
+    error InvalidNullifier();
+
+    constructor() {
+        isValid = true;
+    }
+
+    function setValid(bool _isValid) external {
+        isValid = _isValid;
+    }
+
+    function verifyProof(
+        uint256 root,
+        uint256 groupId,
+        uint256 signal,
+        uint256 nullifierHash,
+        uint256 externalNullifier,
+        uint256[8] calldata proof
+    ) external view override {
+        require(isValid, "Mock WorldID: Invalid proof");
+        if (nullifierHashes[nullifierHash]) {
+            revert InvalidNullifier();
+        }
+        require(root != 0, "Mock WorldID: Invalid root");
+        require(groupId != 0, "Mock WorldID: Invalid group ID");
+        require(signal != 0, "Mock WorldID: Invalid signal");
+        require(nullifierHash != 0, "Mock WorldID: Invalid nullifier hash");
+        require(externalNullifier != 0, "Mock WorldID: Invalid external nullifier");
+        require(proof.length == 8, "Mock WorldID: Invalid proof length");
+    }
+
+    function registerNullifier(uint256 nullifierHash) external {
+        nullifierHashes[nullifierHash] = true;
+    }
+
+    function isNullifierUsed(uint256 nullifierHash) external view returns (bool) {
+        return nullifierHashes[nullifierHash];
+    }
+}
 
 contract EventNFTTest is Test, Merkle {
-  EventNFT private eventNFT;
-  address private owner;
-  address private eventContract;
-  address private participant1;
-  address private participant2;
-  bytes32 private merkleRoot;
+    EventNFT private eventNFT;
+    MockWorldID private worldId;
+    
+    address private owner;
+    address private eventContract;
+    address private participant1;
+    address private participant2;
+    address private nonParticipant;
 
-  // Sample Merkle Tree for testing
-  bytes32[] private proof1;
-  bytes32[] private proof2;
-  bytes32[] private leafs;
+    uint256 private constant WORLD_ID_ROOT = 1;
+    uint256 private constant GROUP_ID = 1;
+    uint256 private constant EXTERNAL_NULLIFIER = 1;
+    uint256[8] private proof;
 
-  function setUp() public {
-    owner = address(1);
-    eventContract = address(2);
-    participant1 = address(3);
-    participant2 = address(4);
+    event AttemptingClaim(address participant, uint256 nextTokenId);
+    event ClaimSuccessful(address participant, uint256 tokenId);
 
-    eventNFT = new EventNFT("EventNFT", "ENFT", 100, "https://base.uri/", eventContract, owner);
+    function setUp() public {
+        owner = address(1);
+        eventContract = address(2);
+        participant1 = address(3);
+        participant2 = address(4);
+        nonParticipant = address(5);
+        
+        worldId = new MockWorldID();
+        
+        // Initialize proof array
+        for(uint i = 0; i < 8; i++) {
+            proof[i] = i + 1; // Simple non-zero values
+        }
 
-    leafs.push(keccak256(abi.encodePacked(participant1)));
-    leafs.push(keccak256(abi.encodePacked(participant2)));
+        eventNFT = new EventNFT(
+            "EventNFT",
+            "ENFT",
+            100,
+            "https://base.uri/",
+            eventContract,
+            owner,
+            address(worldId)
+        );
+        
+        vm.label(owner, "Owner");
+        vm.label(eventContract, "Event Contract");
+        vm.label(participant1, "Participant 1");
+        vm.label(participant2, "Participant 2");
+    }
 
-    merkleRoot = getRoot(leafs);
-    proof1 = getProof(leafs, 0);
-    proof2 = getProof(leafs, 1);
+    function testInitialState() public {
+        assertEq(eventNFT.owner(), owner);
+        assertEq(eventNFT.eventContract(), eventContract);
+        assertEq(eventNFT.maxSupply(), 100);
+        assertEq(eventNFT.worldIDAddr(), address(worldId));
+    }
 
-    vm.prank(owner);
-    eventNFT.setMerkleRoot(merkleRoot);
-  }
+    function testSetEventContract() public {
+        address newEventContract = address(10);
+        
+        vm.prank(owner);
+        eventNFT.setEventContract(newEventContract);
+        
+        assertEq(eventNFT.eventContract(), newEventContract);
+    }
 
-  function testDeploy() public view {
-    assertEq(eventNFT.owner(), owner, "Owner address mismatch");
-    assertEq(eventNFT.eventContract(), eventContract, "Event contract address mismatch");
-    assertEq(eventNFT.maxSupply(), 100, "Max supply mismatch");
-  }
+    function testFailSetEventContractNonOwner() public {
+        address newEventContract = address(10);
+        
+        vm.prank(participant1);
+        eventNFT.setEventContract(newEventContract);
+    }
 
-  function testClaimNFT() public {
-    vm.prank(eventContract);
-    eventNFT.claimNFT(participant1, proof1);
+    function testFailSetEventContractZeroAddress() public {
+        vm.prank(owner);
+        eventNFT.setEventContract(address(0));
+    }
 
-    assertTrue(eventNFT.claimed(participant1), "Participant1 should have claimed their NFT");
+    function testSuccessfulClaim() public {
+        uint256 nullifierHash = 123;
+        
+        vm.prank(eventContract);
+        vm.expectEmit(true, true, true, true);
+        emit AttemptingClaim(participant1, 0);
+        
+        vm.expectEmit(true, true, true, true);
+        emit ClaimSuccessful(participant1, 0);
+        
+        (bool success, address claimant, uint256 tokenId) = eventNFT.claimNFTWithZk(
+            WORLD_ID_ROOT,
+            GROUP_ID,
+            nullifierHash,
+            EXTERNAL_NULLIFIER,
+            proof,
+            participant1
+        );
+        
+        assertTrue(success);
+        assertEq(claimant, participant1);
+        assertEq(tokenId, 0);
+        assertTrue(eventNFT.hasClaimedNFT(participant1));
+        assertEq(eventNFT.ownerOf(0), participant1);
+    }
 
-    assertEq(eventNFT.balanceOf(participant1), 1, "Participant1 should have 1 token");
+    function testFailClaimNonEventContract() public {
+        uint256 nullifierHash = 123;
+        
+        vm.prank(participant1);
+        eventNFT.claimNFTWithZk(
+            WORLD_ID_ROOT,
+            GROUP_ID,
+            nullifierHash,
+            EXTERNAL_NULLIFIER,
+            proof,
+            participant1
+        );
+    }
 
-    // Participant2 claims their NFT
-    vm.prank(eventContract);
-    eventNFT.claimNFT(participant2, proof2);
+    function testFailClaimWithInvalidWorldIDProof() public {
+        uint256 nullifierHash = 123;
+        worldId.setValid(false);
+        
+        vm.prank(eventContract);
+        eventNFT.claimNFTWithZk(
+            WORLD_ID_ROOT,
+            GROUP_ID,
+            nullifierHash,
+            EXTERNAL_NULLIFIER,
+            proof,
+            participant1
+        );
+    }
 
-    assertTrue(eventNFT.claimed(participant2), "Participant2 should have claimed their NFT");
-    assertEq(eventNFT.balanceOf(participant2), 1, "Participant2 should have 1 token");
-  }
+    function testFailClaimWithUsedNullifier() public {
+        uint256 nullifierHash = 123;
+        worldId.registerNullifier(nullifierHash);
+        
+        vm.prank(eventContract);
+        eventNFT.claimNFTWithZk(
+            WORLD_ID_ROOT,
+            GROUP_ID,
+            nullifierHash,
+            EXTERNAL_NULLIFIER,
+            proof,
+            participant1
+        );
+    }
 
-  function testClaimNFTAlreadyClaimed() public {
-    vm.prank(eventContract);
-    eventNFT.claimNFT(participant1, proof1);
+    function testFailClaimBeyondMaxSupply() public {
+        // Create NFT with max supply of 1
+        EventNFT limitedNFT = new EventNFT(
+            "LimitedNFT",
+            "LNFT",
+            1,
+            "https://base.uri/",
+            eventContract,
+            owner,
+            address(worldId)
+        );
+        
+        uint256 nullifierHash1 = 123;
+        uint256 nullifierHash2 = 456;
+        
+        // First claim should succeed
+        vm.prank(eventContract);
+        limitedNFT.claimNFTWithZk(
+            WORLD_ID_ROOT,
+            GROUP_ID,
+            nullifierHash1,
+            EXTERNAL_NULLIFIER,
+            proof,
+            participant1
+        );
+        
+        // Second claim should fail
+        vm.prank(eventContract);
+        limitedNFT.claimNFTWithZk(
+            WORLD_ID_ROOT,
+            GROUP_ID,
+            nullifierHash2,
+            EXTERNAL_NULLIFIER,
+            proof,
+            participant2
+        );
+    }
 
-    vm.expectRevert("EventNFT: You have already claimed your NFT");
-    vm.prank(eventContract);
-    eventNFT.claimNFT(participant1, proof1);
-  }
+    function testSetBaseURI() public {
+        string memory newBaseURI = "https://new.base.uri/";
+        
+        vm.prank(owner);
+        eventNFT.setBaseURI(newBaseURI);
+    }
 
-  function testClaimNFTInvalidMerkleProof() public {
-    address minter = address(999);
-    bytes32[] memory tempLeafs = leafs;
-    //replace the last leaf with the new address's hash who is not whitelisted.
-    tempLeafs[1] = keccak256(abi.encodePacked(minter));
-
-    bytes32[] memory invalidProof = getProof(tempLeafs, 1);
-
-    vm.expectRevert("EventNFT: You are not an eligible participant");
-    vm.prank(eventContract);
-    eventNFT.claimNFT(minter, invalidProof);
-  }
-
-  function testOnlyEventContractCanClaim() public {
-    // Try calling claimNFT from an address that's not the event contract
-    vm.prank(address(999));
-    vm.expectRevert("EventNFT: Only event contract can mint");
-    eventNFT.claimNFT(participant1, proof1);
-  }
-
-  function testSetMerkleRoot() public {
-    bytes32 newMerkleRoot = keccak256(abi.encodePacked(participant1, participant2)); // New Merkle
-      // root
-    vm.prank(owner);
-    eventNFT.setMerkleRoot(newMerkleRoot);
-
-    assertEq(eventNFT.merkleRoot(), newMerkleRoot, "Merkle root should be updated");
-  }
-
-  function testSetEventContract() public {
-    address newEventContract = address(999);
-    vm.prank(owner);
-    eventNFT.setEventContract(newEventContract);
-
-    assertEq(eventNFT.eventContract(), newEventContract, "Event contract address should be updated");
-  }
-
-  function testOnlyOwnerCanSetEventContract() public {
-    address newEventContract = address(999);
-    vm.expectRevert();
-    vm.prank(address(2));
-    eventNFT.setEventContract(newEventContract);
-  }
+    function testFailSetBaseURINonOwner() public {
+        string memory newBaseURI = "https://new.base.uri/";
+        
+        vm.prank(participant1);
+        eventNFT.setBaseURI(newBaseURI);
+    }
 }

@@ -142,7 +142,7 @@ contract EventManagerTest is Test {
     string constant EVENT_DESCRIPTION = "Test Description";
     uint256 constant FUTURE_TIMESTAMP = 1_735_689_600; // Jan 1, 2025
     uint256 constant REWARD_AMOUNT = 100;
-
+    uint256 constant BONUSTOKEN = 10;
 
     event BulkTokenRewardSet(
         uint256 indexed eventId,
@@ -179,7 +179,8 @@ contract EventManagerTest is Test {
             100,
             "https://base.uri/",
             address(eventManager),
-            owner
+            owner,
+            address(mockWorldId)
         );
 
         // Set reward contract
@@ -424,5 +425,34 @@ contract EventManagerTest is Test {
         assertTrue(mockEventNFT.hasClaimedNFT(user1));
     }
 
-    receive() external payable {}
+    function testGiveFirstParticipantTokenBonus() public {
+        testCreateEvent();
+
+        // Register participant
+
+        uint256[8] memory proof;
+        vm.prank(user1);
+        eventManager.registerParticipant(0, 12_345, proof);
+
+        vm.prank(user2);
+        eventManager.registerParticipant(0, 12_346, proof);
+
+        // Set reward
+        vm.startPrank(eventCreator);
+        uint256 newRewardAmount = 200;
+        eventManager.updateEventTokenReward(0, newRewardAmount);
+        eventManager.setTokenRewardForParticipant(0, user1, REWARD_AMOUNT);
+        eventManager.setTokenRewardForParticipant(0, user2, REWARD_AMOUNT);
+
+        eventManager.giveFirstParticipantTokenBonus(0, BONUSTOKEN);
+        vm.stopPrank();
+
+        uint256 distributedReward = mockRewardManager.getUserTokenReward(
+            0,
+            address(user1)
+        );
+        console.log(distributedReward);
+
+        assertEq(distributedReward, REWARD_AMOUNT + 10);
+    }
 }
