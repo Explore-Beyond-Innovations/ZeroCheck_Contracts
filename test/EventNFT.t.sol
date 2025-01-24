@@ -23,6 +23,8 @@ contract EventNFTTest is Test {
     participant2 = address(4);
     nonParticipant = address(5);
 
+    vm.prank(owner);
+
     eventNFT = new EventNFT(
       "EventNFT", "ENFT", 100, "https://base.uri/", "https://bonusbase.uri/", eventManager
     );

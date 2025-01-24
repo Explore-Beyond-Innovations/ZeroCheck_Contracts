@@ -124,10 +124,10 @@ contract EventManager is Ownable, IEventManager {
     require(bytes(name).length > 0, "Event name is required");
     require(bytes(description).length > 0, "Description is required");
     require(timestamp > block.timestamp, "Timestamp must be in the future");
-
+    uint256 eventId = nextEventId;
     // Create and store the event in the mapping
-    events[nextEventId] = Event({
-      id: nextEventId,
+    events[eventId] = Event({
+      id: eventId,
       name: name,
       description: description,
       timestamp: timestamp,
@@ -138,10 +138,11 @@ contract EventManager is Ownable, IEventManager {
       isEnded: false
     });
 
-    eventIds.push(nextEventId);
+    eventIds.push(eventId);
+
     nextEventId++;
 
-    emit EventRegistered(nextEventId, description, msg.sender);
+    emit EventRegistered(eventId, description, msg.sender);
   }
 
   /// @dev Close an Event
