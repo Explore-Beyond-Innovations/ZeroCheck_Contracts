@@ -13,13 +13,11 @@ optimizer = true
 optimizer_runs = 10_000
 
 
-
 remappings = [
     'src/=src/',
     'ds-test/=lib/ds-test/src/',
     '@prb/test/=lib/prb-test/src/',
-    '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/'
-
+    '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/',
 ]
 
 
