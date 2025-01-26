@@ -1,94 +1,86 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// import "./EventRewardManager.t.sol";
+import "forge-std/console.sol";
 
-// contract WithdrawUnclaimedReward is EventRewardManagerTest {
-//   // Function to test withdraw unclaim rewards
-//   function testWithdrawUnclaimedRewards() public {
-//     //Create a token reward
-//     rewardManager.createTokenReward(
-//       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
-//     );
+import "./EventRewardManager.t.sol";
 
-//     //Fast forward time
-//     vm.warp(block.timestamp + 31 days);
+contract WithdrawUnclaimedReward is EventRewardManagerTest {
+  // Function to test withdraw unclaim rewards
+  function testWithdrawUnclaimedRewards() public {
+    //Create a token reward
+    testCreateTokenReward();
 
-//     uint256 balanceBefore = usdcToken.balanceOf(address(this));
-//     rewardManager.withdrawUnclaimedRewards(eventId);
-//     uint256 balanceAfter = usdcToken.balanceOf(address(this));
+    //Fast forward time
+    vm.warp(block.timestamp + 31 days);
 
-//     assertEq(balanceAfter - balanceBefore, rewardAmount);
+    uint256 balanceBefore = usdcToken.balanceOf(eventCreator);
+    vm.prank(address(eventManager));
+    rewardManager.withdrawUnclaimedRewards(eventId, eventCreator);
+    uint256 balanceAfter = usdcToken.balanceOf(eventCreator);
 
-//     (,,, uint256 eventRewardAmount,, bool isCancelled, uint256 claimedAmount,) =
-//       rewardManager.eventTokenRewards(eventId);
+    assertEq(balanceAfter - balanceBefore, rewardAmount);
 
-//     assertEq(eventRewardAmount, 0, "Reward amount should be 0 after full withdrawal");
-//     assertTrue(isCancelled, "Event should be cancelled after full withdrawal");
-//     assertEq(claimedAmount, 0, "Claimed amount should remain 0");
-//   }
+    (,,, uint256 eventRewardAmount,, bool isCancelled, uint256 claimedAmount) =
+      rewardManager.eventTokenRewards(eventId);
 
-//   // Function to test withdraw before the limited time
-//   function testWithdrawBeforeTimeout() public {
-//     rewardManager.createTokenReward(
-//       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
-//     );
+    assertEq(eventRewardAmount, 0, "Reward amount should be 0 after full withdrawal");
+    assertTrue(isCancelled, "Event should be cancelled after full withdrawal");
+    assertEq(claimedAmount, 0, "Claimed amount should remain 0");
+  }
 
-//     vm.expectRevert("Withdrawal timeout not reached");
-//     rewardManager.withdrawUnclaimedRewards(eventId);
-//   }
+  // Function to test withdraw before the limited time
+  function testWithdrawBeforeTimeout() public {
+    //Create a token reward
+    testCreateTokenReward();
 
-//   // Function to test partial withdraw unclaimed rewards
-//   function testWithdrawUnclaimedRewardsPartial() public {
-//     rewardManager.createTokenReward(
-//       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
-//     );
+    vm.expectRevert("Withdrawal timeout not reached");
+    vm.prank(address(eventManager));
+    rewardManager.withdrawUnclaimedRewards(eventId, eventCreator);
+  }
 
-//     uint256 claimAmount = rewardAmount / 2;
-//     rewardManager.distributeTokenReward(eventId, participant, claimAmount);
+  // Function to test partial withdraw unclaimed rewards
+  function testWithdrawUnclaimedRewardsPartial() public {
+    //Create a token reward
+    testCreateTokenReward();
 
-//     // Fast forward time
-//     vm.warp(block.timestamp + 31 days);
+    uint256 claimAmount = rewardAmount / 2;
+    vm.prank(address(eventManager));
+    rewardManager.distributeTokenReward(eventId, eventCreator, participant, claimAmount);
 
-//     uint256 initialBalance = usdcToken.balanceOf(address(this));
+    // Fast forward time
+    vm.warp(block.timestamp + 31 days);
 
-//     rewardManager.withdrawUnclaimedRewards(eventId);
+    uint256 initialBalance = usdcToken.balanceOf(address(eventCreator));
 
-//     uint256 finalBalance = usdcToken.balanceOf(address(this));
+    // Fast forward time
+    vm.warp(block.timestamp + 31 days);
+    vm.prank(address(eventManager));
+    rewardManager.withdrawUnclaimedRewards(eventId, address(eventCreator));
 
-//     assertEq(
-//       finalBalance - initialBalance, rewardAmount - claimAmount, "Incorrect withdrawal amount"
-//     );
+    uint256 finalBalance = usdcToken.balanceOf(address(eventCreator));
 
-//     (,,, uint256 eventRewardAmount,, bool isCancelled,,) =
-// rewardManager.eventTokenRewards(eventId);
+    assertEq(
+      finalBalance - initialBalance, rewardAmount - claimAmount, "Incorrect withdrawal amount"
+    );
 
-//     assertEq(eventRewardAmount, 0, "Reward amount should be 0 after full withdrawal");
-//     assertTrue(isCancelled, "Event should be cancelled after full withdrawal");
-//   }
+    (,,, uint256 eventRewardAmount,, bool isCancelled,) = rewardManager.eventTokenRewards(eventId);
 
-//   // Function to test cancel and reclaim reward before the limited time
-//   function testCancelAndReclaimRewardBeforeTimeout() public {
-//     rewardManager.createTokenReward(
-//       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
-//     );
+    assertEq(eventRewardAmount, 0, "Reward amount should be 0 after full withdrawal");
+    assertTrue(isCancelled, "Event should be cancelled after full withdrawal");
+  }
 
-//     vm.expectRevert("Withdrawal timeout not reached");
-//     rewardManager.withdrawUnclaimedRewards(eventId);
-//   }
+  // Function to test withdraw unclaim rewards for someone who isn't the event manager
+  function testWithdrawUnclaimedRewardsNonManager() public {
+    //Create a token reward
+    testCreateTokenReward();
 
-//   // Function to test withdraw unclaim rewards for someone who isn't the event manager
-//   function testWithdrawUnclaimedRewardsNonManager() public {
-//     rewardManager.createTokenReward(
-//       eventId, EventRewardManager.TokenType.USDC, address(usdcToken), rewardAmount
-//     );
+    // Fast forward time
+    vm.warp(block.timestamp + 31 days);
 
-//     // Fast forward time
-//     vm.warp(block.timestamp + 31 days);
-
-//     address nonManager = address(0x1234);
-//     vm.prank(nonManager);
-//     vm.expectRevert("Only event manager allowed");
-//     rewardManager.withdrawUnclaimedRewards(eventId);
-//   }
-// }
+    address nonManager = address(0x1234);
+    vm.prank(nonManager);
+    vm.expectRevert("Only event manager allowed");
+    rewardManager.withdrawUnclaimedRewards(eventId, eventCreator);
+  }
+}
