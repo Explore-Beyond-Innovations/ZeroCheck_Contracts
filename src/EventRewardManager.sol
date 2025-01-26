@@ -416,8 +416,8 @@ contract EventRewardManager is Ownable, IEventRewardManager {
     }
 
     IERC20 token = IERC20(eventReward.tokenAddress);
-    require(token.transfer(msg.sender, remainingReward), "Token withdrawal failed");
+    require(token.transfer(creator, remainingReward), "Token withdrawal failed");
 
-    emit TokenRewardWithdrawn(_eventId, msg.sender, remainingReward, cancelled);
+    emit TokenRewardWithdrawn(_eventId, creator, remainingReward, cancelled);
   }
 }
