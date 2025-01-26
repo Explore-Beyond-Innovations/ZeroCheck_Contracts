@@ -1,109 +1,76 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import { EventManager } from "../EventManager.sol";
+
 interface IEventRewardManager {
-    enum TokenType {
-        NONE,
-        USDC,
-        WLD,
-        NFT
-    }
+  enum TokenType {
+    NONE,
+    USDC,
+    WLD,
+    NFT
+  }
 
-    struct TokenReward {
-        address eventManager;
-        address tokenAddress;
-        TokenType tokenType;
-        uint256 rewardAmount;
-        uint256 createdAt;
-        bool isCancelled;
-        uint256 claimedAmount;
-    }
+  function createNFTReward(
+    uint256 _eventId,
+    address creator,
+    TokenType _tokenType,
+    string memory _name,
+    string memory _symbol,
+    uint256 _maxSupply,
+    string memory _baseURI,
+    string memory _BonusbaseURI
+  )
+    external;
 
-    event TokenRewardCreated(
-        uint256 indexed eventId,
-        address indexed eventManager,
-        address tokenAddress,
-        TokenType tokenType,
-        uint256 indexed rewardAmount
-    );
+  function createTokenReward(
+    uint256 _eventId,
+    address creator,
+    TokenType _tokenType,
+    address _tokenAddress,
+    uint256 _rewardAmount
+  )
+    external;
 
-    event TokenRewardUpdated(
-        uint256 indexed eventId,
-        address indexed eventManager,
-        uint256 indexed newRewardAmount
-    );
+  function updateTokenReward(uint256 _eventId, address eventCreator, uint256 _amount) external;
 
-    event TokenRewardWithdrawn(
-        uint256 indexed eventId,
-        address indexed eventManager,
-        uint256 indexed amount,
-        bool cancelled
-    );
+  function distributeTokenReward(
+    uint256 _eventId,
+    address _creator,
+    address _recipient,
+    uint256 _participantReward
+  )
+    external;
 
-    event TokenRewardDistributed(
-        uint256 indexed eventId,
-        address indexed recipient,
-        uint256 amount
-    );
+  function distributeMultipleTokenRewards(
+    uint256 _eventId,
+    address _creator,
+    address[] calldata _recipients,
+    uint256[] calldata _participantRewards
+  )
+    external;
 
-    event MultipleTokenRewardDistributed(
-        uint256 indexed eventId,
-        address[] indexed recipients,
-        uint256[] amounts
-    );
+  function getUserTokenReward(uint256 _eventId, address _user) external view returns (uint256);
 
-    event TokenRewardClaimed(
-        uint256 indexed eventId,
-        address indexed recipient,
-        uint256 amount
-    );
+  function getMultipleDistributedTokenRewards(
+    uint256 _eventId,
+    address[] calldata _participants
+  )
+    external
+    view
+    returns (uint256[] memory);
 
-    function createTokenReward(
-        uint256 _eventId,
-        TokenType _tokenType,
-        address _tokenAddress,
-        uint256 _rewardAmount,
-        address _creator
-    ) external;
+  function setFirstParticipantTokenBonus(
+    uint256 _eventId,
+    address _eventCreator,
+    address _recipient,
+    uint256 _bonus
+  )
+    external;
 
-    function updateTokenReward(
-        address eventmanager,
-        uint256 _eventId,
-        uint256 _amount
-    ) external;
+  function claimTokenReward(uint256 _eventId, address participant) external;
 
-    function distributeTokenReward(
-        address eventManager,
-        uint256 _eventId,
-        address _recipient,
-        uint256 _participantReward
-    ) external;
+  function claimNFTReward(uint256 _eventId, address participant) external;
 
-    function distributeMultipleTokenRewards(
-        address _caller,
-        uint256 _eventId,
-        address[] calldata _recipients,
-        uint256[] calldata _participantRewards
-    ) external;
-
-    function getUserTokenReward(
-        uint256 _eventId,
-        address _user
-    ) external view returns (uint256);
-
-    function getMultipleDistributedTokenRewards(
-        uint256 _eventId,
-        address[] calldata _participants
-    ) external view returns (uint256[] memory);
-
-    function claimTokenReward(uint256 _eventId, address _participant) external;
-
-    function withdrawUnclaimedRewards(uint256 _eventId) external;
-
-    function setFirstParticipantTokenBonus(
-        uint256 _eventId,
-        address _recipient,
-        address _eventCreator,
-        uint256 _bonus
-    ) external;
+  function withdrawUnclaimedRewards(uint256 _eventId, address creator) external;
 }
