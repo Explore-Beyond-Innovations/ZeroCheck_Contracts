@@ -67,12 +67,12 @@ contract EventRewardManager is Ownable, IEventRewardManager {
 
   modifier checkEventCreator(uint256 _eventId, address _caller) {
     EventManager.Event memory ev = eventManager.getEvent(_eventId);
-    require(_caller == ev.creator, "Not event manager");
+    require(_caller == ev.creator, "Not event creator");
     _;
   }
 
   modifier onlyEventContract() {
-    require(msg.sender == address(eventManager), "EventNFT: Only event contract can mint");
+    require(msg.sender == address(eventManager), "Only event manager allowed");
     _;
   }
 
@@ -120,7 +120,7 @@ contract EventRewardManager is Ownable, IEventRewardManager {
       isCancelled: false
     });
 
-    emit RewardCreated(_eventId, creator, address(eventManager), _tokenType, 1);
+    emit RewardCreated(_eventId, creator, address(nft), _tokenType, 1);
   }
 
   // Create token-based event rewards
@@ -159,20 +159,20 @@ contract EventRewardManager is Ownable, IEventRewardManager {
 
     // Transfer tokens from event manager to contract
     IERC20 token = IERC20(_tokenAddress);
-    require(token.transferFrom(msg.sender, address(this), _rewardAmount), "Token transfer failed");
+    require(token.transferFrom(creator, address(this), _rewardAmount), "Token transfer failed");
 
-    emit RewardCreated(_eventId, msg.sender, _tokenAddress, _tokenType, _rewardAmount);
+    emit RewardCreated(_eventId, creator, _tokenAddress, _tokenType, _rewardAmount);
   }
 
   // Update token-based event reward amount
   function updateTokenReward(
     uint256 _eventId,
-    address eventCreator,
+    address creator,
     uint256 _amount
   )
     external
     onlyEventContract
-    checkEventCreator(_eventId, eventCreator)
+    checkEventCreator(_eventId, creator)
   {
     checkZeroAddress();
 
@@ -187,9 +187,9 @@ contract EventRewardManager is Ownable, IEventRewardManager {
     eventReward.rewardAmount += _amount;
 
     IERC20 token = IERC20(eventReward.tokenAddress);
-    require(token.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+    require(token.transferFrom(creator, address(this), _amount), "Token transfer failed");
 
-    emit TokenRewardUpdated(_eventId, msg.sender, _amount);
+    emit TokenRewardUpdated(_eventId, creator, _amount);
   }
 
   // Function to distribute tokens to event participants

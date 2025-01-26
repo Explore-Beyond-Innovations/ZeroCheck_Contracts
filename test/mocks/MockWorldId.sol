@@ -5,6 +5,7 @@ import { IWorldID } from "../../src/interfaces/IWorldID.sol";
 
 contract MockWorldID is IWorldID {
   bool private isValid;
+  uint256 private validRoot = 123_456_789;
   mapping(uint256 => bool) public nullifierHashes;
 
   error InvalidNullifier();
@@ -13,8 +14,8 @@ contract MockWorldID is IWorldID {
     isValid = true;
   }
 
-  function setValid(bool _isValid) external {
-    isValid = _isValid;
+  function setValidRoot(uint256 _root) external {
+    validRoot = _root;
   }
 
   function verifyProof(
